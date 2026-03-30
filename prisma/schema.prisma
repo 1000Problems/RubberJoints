@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Users & Auth ──
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(50)
+  passwordHash String   @db.VarChar(128)
+  salt         String   @db.VarChar(64)
+  createdDate  DateTime @default(now())
+
+  dailyChecks     DailyCheck[]
+  userMilestones  UserMilestone[]
+  sessionLogs     SessionLog[]
+  userSettings    UserSettings?
+  enrollments     UserEnrollment[]
+  dailyPlan       UserDailyPlan[]
+  userSupplements UserSupplement[]
+  preferences     UserPreferences?
+}
+
+// ── Exercise & Supplement Catalogs ──
+
+model Exercise {
+  id          String  @id @db.VarChar(50)
+  name        String  @db.VarChar(200)
+  category    String  @db.VarChar(50) // warmup_tool, mobility, recovery_tool
+  targets     String? @db.VarChar(500)
+  description String? @db.Text
+  cues        String? @db.Text
+  explanation String? @db.Text
+  warning     String? @db.Text
+  phases      String? @db.VarChar(200)
+  defaultRx   String? @db.VarChar(200)
+
+  sessionSteps     SessionStep[]
+  dailyChecks      DailyCheck[]
+  programTemplates ProgramTemplate[]
+  dailyPlan        UserDailyPlan[]
+}
+
+model Supplement {
+  id        String  @id @db.VarChar(50)
+  name      String  @db.VarChar(200)
+  dose      String? @db.VarChar(200)
+  time      String? @db.VarChar(200)
+  timeGroup String  @db.VarChar(10) // am, mid, pm
+
+  dailyChecks     DailyCheck[]
+  userSupplements UserSupplement[]
+}
+
+// ── Session Templates ──
+
+model SessionStep {
+  id         Int     @id @default(autoincrement())
+  dayType    String  @db.VarChar(20)
+  exerciseId String  @db.VarChar(50)
+  phase1Rx   String? @db.VarChar(200)
+  phase2Rx   String? @db.VarChar(200)
+  phaseOnly  Int?
+  section    String? @db.VarChar(50)
+  sortOrder  Int     @default(0)
+
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+}
+
+// ── Daily Tracking ──
+
+model DailyCheck {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  date         DateTime @db.Date
+  itemType     String   @db.VarChar(20) // step, supplement
+  itemId       String   @db.VarChar(50)
+  stepIndex    Int      @default(0)
+  checked      Boolean  @default(false)
+
+  user         User      @relation(fields: [userId], references: [id])
+  exercise     Exercise? @relation(fields: [itemId], references: [id], map: "dailycheck_exercise_fk")
+  supplement   Supplement? @relation(fields: [itemId], references: [id], map: "dailycheck_supplement_fk")
+
+  @@unique([userId, date, itemType, itemId, stepIndex])
+}
+
+// ── Milestones ──
+
+model Milestone {
+  id           String    @id @db.VarChar(50)
+  name         String    @db.VarChar(200)
+  description  String?   @db.Text
+  done         Boolean   @default(false)
+  achievedDate DateTime?
+
+  userMilestones UserMilestone[]
+}
+
+model UserMilestone {
+  userId       Int
+  milestoneId  String   @db.VarChar(50)
+  done         Boolean  @default(false)
+  achievedDate DateTime?
+
+  user      User      @relation(fields: [userId], references: [id])
+  milestone Milestone @relation(fields: [milestoneId], references: [id])
+
+  @@id([userId, milestoneId])
+}
+
+// ── Session Logs ──
+
+model SessionLog {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  date       DateTime @db.Date
+  stepsDone  Int      @default(0)
+  stepsTotal Int      @default(0)
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+}
+
+// ── User Settings ──
+
+model UserSettings {
+  userId        Int      @id
+  startDate     DateTime? @db.Date
+  disabledTools String?  @db.Text // CSV of disabled exercise IDs
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+// ── Programs & Enrollment ──
+
+model Program {
+  id           Int    @id @default(autoincrement())
+  name         String @db.VarChar(200)
+  durationDays Int
+  description  String? @db.Text
+
+  templates   ProgramTemplate[]
+  enrollments UserEnrollment[]
+  dailyPlan   UserDailyPlan[]
+}
+
+model ProgramTemplate {
+  id         Int    @id @default(autoincrement())
+  programId  Int
+  dayNumber  Int
+  dayType    String @db.VarChar(20)
+  exerciseId String @db.VarChar(50)
+  category   String @db.VarChar(50)
+  sortOrder  Int    @default(0)
+  rx         String? @db.VarChar(200)
+
+  program  Program  @relation(fields: [programId], references: [id])
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+}
+
+model UserEnrollment {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  programId Int
+  startDate DateTime @db.Date
+  status    String   @default("active") @db.VarChar(20) // active, completed, paused
+
+  user    User    @relation(fields: [userId], references: [id])
+  program Program @relation(fields: [programId], references: [id])
+}
+
+// ── User Daily Plan ──
+
+model UserDailyPlan {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  programId  Int
+  date       DateTime @db.Date
+  dayType    String   @db.VarChar(20)
+  exerciseId String   @db.VarChar(50)
+  category   String   @db.VarChar(50)
+  sortOrder  Int      @default(0)
+  rx         String?  @db.VarChar(200)
+  aiAdjusted Boolean  @default(false)
+  isManual   Boolean  @default(false)
+
+  user     User     @relation(fields: [userId], references: [id])
+  program  Program  @relation(fields: [programId], references: [id])
+  exercise Exercise @relation(fields: [exerciseId], references: [id])
+
+  @@unique([userId, date, exerciseId])
+}
+
+// ── User Supplements ──
+
+model UserSupplement {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  supplementId String   @db.VarChar(50)
+  timeGroup    String   @db.VarChar(10)
+  addedDate    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id])
+  supplement Supplement @relation(fields: [supplementId], references: [id])
+
+  @@unique([userId, supplementId])
+}
+
+// ── User Preferences (Onboarding) ──
+
+model UserPreferences {
+  userId              Int     @id
+  hasGym              Boolean @default(false)
+  daysPerWeek         Int     @default(5)
+  onboardingStep      Int     @default(0)
+  selectedExercises   String? @db.Text // CSV
+  selectedSupplements String? @db.Text // CSV
+  profileNotes        String? @db.Text
+
+  user User @relation(fields: [userId], references: [id])
+}
