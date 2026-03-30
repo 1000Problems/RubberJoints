@@ -30,13 +30,34 @@ function verifyToken(token: string): number | null {
   return parseInt(userId, 10);
 }
 
+// ── PBKDF2 (legacy, from original ASP.NET app) ──
+
+function verifyPbkdf2(password: string, storedHash: string, storedSalt: string): boolean {
+  const salt = Buffer.from(storedSalt, "base64");
+  const hash = crypto.pbkdf2Sync(password, salt, 100_000, 32, "sha256");
+  const expected = Buffer.from(storedHash, "base64");
+  if (hash.length !== expected.length) return false;
+  return crypto.timingSafeEqual(hash, expected);
+}
+
+function isPbkdf2Hash(hash: string): boolean {
+  // bcrypt hashes start with "$2a$" or "$2b$", PBKDF2 are base64 (~44 chars)
+  return !hash.startsWith("$2");
+}
+
+// ── bcrypt (new registrations) ──
+
 export async function hashPassword(password: string): Promise<{ hash: string; salt: string }> {
   const salt = await bcrypt.genSalt(12);
   const hash = await bcrypt.hash(password, salt);
   return { hash, salt };
 }
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+// Verifies against both legacy PBKDF2 and new bcrypt hashes
+export async function verifyPassword(password: string, hash: string, salt?: string): Promise<boolean> {
+  if (isPbkdf2Hash(hash) && salt) {
+    return verifyPbkdf2(password, hash, salt);
+  }
   return bcrypt.compare(password, hash);
 }
 

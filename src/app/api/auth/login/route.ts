@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, createSession } from "@/lib/auth";
+import { verifyPassword, hashPassword, createSession } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   const { username, password } = await req.json();
@@ -14,9 +14,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 
-  const valid = await verifyPassword(password, user.passwordHash);
+  const valid = await verifyPassword(password, user.passwordHash, user.salt);
   if (!valid) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  }
+
+  // Upgrade legacy PBKDF2 hash to bcrypt on successful login
+  if (!user.passwordHash.startsWith("$2")) {
+    const { hash, salt } = await hashPassword(password);
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: hash, salt },
+    });
   }
 
   await createSession(user.id);
