@@ -11,8 +11,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "date, itemType, itemId required" }, { status: 400 });
   }
 
-  const dateObj = new Date(date);
-  dateObj.setHours(0, 0, 0, 0);
+  const dateObj = new Date(date + "T00:00:00Z");
 
   await prisma.dailyCheck.upsert({
     where: {
