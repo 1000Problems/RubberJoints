@@ -15,11 +15,7 @@ export default function RegisterPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-
-    if (password !== confirm) {
-      setError("Passwords don't match");
-      return;
-    }
+    if (password !== confirm) { setError("Passwords don't match"); return; }
 
     setLoading(true);
     const res = await fetch("/api/auth/register", {
@@ -37,51 +33,68 @@ export default function RegisterPage() {
     }
   }
 
+  const inputStyle = {
+    background: "var(--s2)",
+    border: "1px solid var(--brd)",
+    color: "var(--tx)",
+  };
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-md p-8">
-        <h1 className="text-2xl font-bold text-center mb-2">RubberJoints</h1>
-        <p className="text-gray-500 text-center text-sm mb-6">Create your account</p>
+    <div className="min-h-screen flex items-center justify-center p-5" style={{ background: "var(--bg)" }}>
+      <div
+        className="w-full max-w-[380px] p-8 rounded-2xl"
+        style={{
+          background: "var(--s1)",
+          border: "1px solid var(--brd)",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+        }}
+      >
+        <div className="text-center text-[1.4rem] font-bold tracking-[3px] mb-2" style={{ color: "var(--acc)" }}>
+          RUBBERJOINTS
+        </div>
+        <p className="text-center text-[0.9rem] mb-8" style={{ color: "var(--tx2)" }}>
+          Create your account
+        </p>
 
-        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+        {error && (
+          <div className="rounded-lg p-3 mb-5 text-[0.85rem]" style={{ background: "rgba(255,59,48,0.1)", color: "var(--red)" }}>
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Username (3+ characters)"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoFocus
-          />
-          <input
-            type="password"
-            placeholder="Password (6+ characters)"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="password"
-            placeholder="Confirm password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <form onSubmit={handleSubmit}>
+          {[
+            { label: "Username", value: username, set: setUsername, type: "text", placeholder: "3+ characters" },
+            { label: "Password", value: password, set: setPassword, type: "password", placeholder: "6+ characters" },
+            { label: "Confirm Password", value: confirm, set: setConfirm, type: "password", placeholder: "" },
+          ].map((f) => (
+            <div key={f.label} className="mb-5">
+              <label className="block text-[0.85rem] mb-1.5" style={{ color: "var(--tx2)" }}>{f.label}</label>
+              <input
+                type={f.type}
+                value={f.value}
+                onChange={(e) => f.set(e.target.value)}
+                placeholder={f.placeholder}
+                className="w-full px-3.5 py-3 rounded-[10px] text-[1rem] outline-none transition-colors duration-150"
+                style={inputStyle}
+                onFocus={(e) => (e.target.style.borderColor = "var(--acc)")}
+                onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+              />
+            </div>
+          ))}
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="w-full py-3.5 rounded-[10px] text-[0.95rem] font-semibold text-white transition-opacity duration-150 disabled:opacity-50"
+            style={{ background: "var(--acc)" }}
           >
             {loading ? "Creating account..." : "Create Account"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-[0.9rem] mt-6" style={{ color: "var(--tx2)" }}>
           Already have an account?{" "}
-          <Link href="/login" className="text-blue-600 hover:underline">
-            Sign In
-          </Link>
+          <Link href="/login" style={{ color: "var(--acc)" }}>Sign In</Link>
         </p>
       </div>
     </div>

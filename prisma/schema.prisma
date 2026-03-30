@@ -41,7 +41,6 @@ model Exercise {
   defaultRx   String? @db.VarChar(200)
 
   sessionSteps     SessionStep[]
-  dailyChecks      DailyCheck[]
   programTemplates ProgramTemplate[]
   dailyPlan        UserDailyPlan[]
 }
@@ -53,7 +52,6 @@ model Supplement {
   time      String? @db.VarChar(200)
   timeGroup String  @db.VarChar(10) // am, mid, pm
 
-  dailyChecks     DailyCheck[]
   userSupplements UserSupplement[]
 }
 
@@ -84,8 +82,8 @@ model DailyCheck {
   checked      Boolean  @default(false)
 
   user         User      @relation(fields: [userId], references: [id])
-  exercise     Exercise? @relation(fields: [itemId], references: [id], map: "dailycheck_exercise_fk")
-  supplement   Supplement? @relation(fields: [itemId], references: [id], map: "dailycheck_supplement_fk")
+  // Polymorphic: itemId references Exercise when itemType="step",
+  // Supplement when itemType="supplement". No DB-level FK enforced.
 
   @@unique([userId, date, itemType, itemId, stepIndex])
 }

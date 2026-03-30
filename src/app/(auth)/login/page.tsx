@@ -32,41 +32,88 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-sm bg-white rounded-xl shadow-md p-8">
-        <h1 className="text-2xl font-bold text-center mb-2">RubberJoints</h1>
-        <p className="text-gray-500 text-center text-sm mb-6">Sign in to your account</p>
+    <div
+      className="min-h-screen flex items-center justify-center p-5"
+      style={{ background: "var(--bg)" }}
+    >
+      <div
+        className="w-full max-w-[380px] p-8 rounded-2xl"
+        style={{
+          background: "var(--s1)",
+          border: "1px solid var(--brd)",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+        }}
+      >
+        <div
+          className="text-center text-[1.4rem] font-bold tracking-[3px] mb-2"
+          style={{ color: "var(--acc)" }}
+        >
+          RUBBERJOINTS
+        </div>
+        <p className="text-center text-[0.9rem] mb-8" style={{ color: "var(--tx2)" }}>
+          Sign in to continue
+        </p>
 
-        {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+        {error && (
+          <div
+            className="rounded-lg p-3 mb-5 text-[0.85rem]"
+            style={{ background: "rgba(255,59,48,0.1)", color: "var(--red)" }}
+          >
+            {error}
+          </div>
+        )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            autoFocus
-          />
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
+        <form onSubmit={handleSubmit}>
+          <div className="mb-5">
+            <label className="block text-[0.85rem] mb-1.5" style={{ color: "var(--tx2)" }}>
+              Username
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="w-full px-3.5 py-3 rounded-[10px] text-[1rem] outline-none transition-colors duration-150"
+              style={{
+                background: "var(--s2)",
+                border: "1px solid var(--brd)",
+                color: "var(--tx)",
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "var(--acc)")}
+              onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+              autoFocus
+            />
+          </div>
+          <div className="mb-5">
+            <label className="block text-[0.85rem] mb-1.5" style={{ color: "var(--tx2)" }}>
+              Password
+            </label>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full px-3.5 py-3 rounded-[10px] text-[1rem] outline-none transition-colors duration-150"
+              style={{
+                background: "var(--s2)",
+                border: "1px solid var(--brd)",
+                color: "var(--tx)",
+              }}
+              onFocus={(e) => (e.target.style.borderColor = "var(--acc)")}
+              onBlur={(e) => (e.target.style.borderColor = "var(--brd)")}
+            />
+          </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 disabled:opacity-50"
+            className="w-full py-3.5 rounded-[10px] text-[0.95rem] font-semibold text-white transition-opacity duration-150 disabled:opacity-50"
+            style={{ background: "var(--acc)" }}
           >
             {loading ? "Signing in..." : "Sign In"}
           </button>
         </form>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        <p className="text-center text-[0.9rem] mt-6" style={{ color: "var(--tx2)" }}>
           No account?{" "}
-          <Link href="/register" className="text-blue-600 hover:underline">
+          <Link href="/register" style={{ color: "var(--acc)" }}>
             Register
           </Link>
         </p>
