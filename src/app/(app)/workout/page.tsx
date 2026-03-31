@@ -236,10 +236,11 @@ export default function WorkoutPage() {
   }
 
   function getDayDisplayLabel() {
-    const today = new Date().toISOString().split("T")[0];
-    if (date === today) return "Today";
     const d = new Date(date + "T12:00:00");
-    return d.toLocaleDateString("en-US", { weekday: "long" });
+    const todayPST = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+    const label = d.toLocaleDateString("en-US", { weekday: "long" });
+    if (date === todayPST) return "Today";
+    return label;
   }
 
   // Picker helpers
@@ -465,7 +466,7 @@ export default function WorkoutPage() {
           borderRadius: "16px",
           border: "1px solid var(--brd)",
           padding: "16px",
-          margin: "0 16px 8px",
+          margin: "16px 16px 12px",
         }}
       >
         <div
@@ -478,7 +479,7 @@ export default function WorkoutPage() {
             marginBottom: "4px",
           }}
         >
-          Today&apos;s Workout
+          TODAY&apos;S WORKOUT
         </div>
         <div
           style={{
@@ -556,24 +557,28 @@ export default function WorkoutPage() {
             background: "var(--s1)",
             borderRadius: "16px",
             border: "1px solid var(--brd)",
-            padding: "8px 4px",
-            margin: "0 16px 8px",
+            padding: "12px 8px",
+            margin: "0 16px 16px",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-around" }}>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
             {weekDays.map((wd) => {
+              const isHighlighted = wd.isToday || wd.isSelected;
               let bg = "transparent";
-              let textColor = "var(--tx)";
+              let labelColor = "var(--tx3)";
+              let numColor = "var(--tx)";
               let opacity = 1;
 
               if (wd.isToday) {
                 bg = "#34c759";
-                textColor = "#ffffff";
+                labelColor = "#ffffff";
+                numColor = "#ffffff";
               } else if (wd.isSelected) {
                 bg = "var(--acc)";
-                textColor = "#ffffff";
+                labelColor = "#ffffff";
+                numColor = "#ffffff";
               }
-              if (wd.isPast && !wd.isToday && !wd.isSelected) {
+              if (wd.isPast && !isHighlighted) {
                 opacity = 0.5;
               }
 
@@ -585,10 +590,10 @@ export default function WorkoutPage() {
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    gap: "2px",
-                    padding: "4px 6px",
-                    borderRadius: "10px",
-                    minWidth: "34px",
+                    gap: "4px",
+                    padding: "6px 8px",
+                    borderRadius: "12px",
+                    minWidth: "38px",
                     textAlign: "center",
                     background: bg,
                     border: "none",
@@ -601,7 +606,8 @@ export default function WorkoutPage() {
                       fontSize: "10px",
                       fontWeight: 700,
                       textTransform: "uppercase",
-                      color: textColor,
+                      letterSpacing: "0.05em",
+                      color: labelColor,
                     }}
                   >
                     {wd.dayLabel}
@@ -610,7 +616,7 @@ export default function WorkoutPage() {
                     style={{
                       fontSize: "16px",
                       fontWeight: 700,
-                      color: textColor,
+                      color: numColor,
                     }}
                   >
                     {wd.dayNumber}
