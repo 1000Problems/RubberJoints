@@ -746,7 +746,7 @@ export default function WorkoutPage() {
                             style={{
                               width: "26px",
                               height: "26px",
-                              borderRadius: "50%",
+                              borderRadius: "8px",
                               border: "2px dashed var(--brd)",
                               opacity: 0.5,
                               flexShrink: 0,
@@ -758,7 +758,7 @@ export default function WorkoutPage() {
                             style={{
                               width: "26px",
                               height: "26px",
-                              borderRadius: "50%",
+                              borderRadius: "8px",
                               border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
                               background: checked ? "var(--grn)" : "transparent",
                               color: "#ffffff",
@@ -1022,9 +1022,9 @@ export default function WorkoutPage() {
                       {isFuture ? (
                         <div
                           style={{
-                            width: "26px",
-                            height: "26px",
-                            borderRadius: "50%",
+                            width: "24px",
+                            height: "24px",
+                            borderRadius: "6px",
                             border: "2px dashed var(--brd)",
                             opacity: 0.5,
                             flexShrink: 0,
@@ -1034,9 +1034,9 @@ export default function WorkoutPage() {
                         <button
                           onClick={() => toggleCheck("supplement", item.supplementId, 0)}
                           style={{
-                            width: "26px",
-                            height: "26px",
-                            borderRadius: "50%",
+                            width: "24px",
+                            height: "24px",
+                            borderRadius: "6px",
                             border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
                             background: checked ? "var(--grn)" : "transparent",
                             color: "#ffffff",
