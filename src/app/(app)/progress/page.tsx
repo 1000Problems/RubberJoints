@@ -262,16 +262,25 @@ export default function ProgressPage() {
                     padding: "12px 16px",
                   }}
                 >
-                  {/* Colored dot */}
+                  {/* Dot/checkbox */}
                   <div
                     style={{
-                      width: "10px",
-                      height: "10px",
+                      width: "26px",
+                      height: "26px",
                       borderRadius: "50%",
-                      background: m.done ? "var(--grn)" : "var(--s3)",
+                      border: m.done ? "none" : "2px solid var(--brd)",
+                      background: m.done ? "var(--grn)" : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                       flexShrink: 0,
+                      color: "#fff",
+                      fontSize: "14px",
+                      fontWeight: 700,
                     }}
-                  />
+                  >
+                    {m.done && "✓"}
+                  </div>
 
                   {/* Name + date - clickable to expand */}
                   <button
@@ -309,13 +318,13 @@ export default function ProgressPage() {
                       onClick={() => markDone(m.id)}
                       disabled={isMarking}
                       style={{
-                        padding: "6px 14px",
-                        borderRadius: "10px",
+                        padding: "6px 12px",
+                        borderRadius: "8px",
                         border: "none",
-                        background: "var(--grn)",
-                        color: "#fff",
+                        background: "var(--s2)",
+                        color: "var(--grn)",
                         fontSize: "12px",
-                        fontWeight: 700,
+                        fontWeight: 600,
                         cursor: isMarking ? "default" : "pointer",
                         opacity: isMarking ? 0.6 : 1,
                         flexShrink: 0,
@@ -324,6 +333,19 @@ export default function ProgressPage() {
                       {isMarking ? "..." : "Done"}
                     </button>
                   )}
+
+                  {/* Expand chevron */}
+                  <span
+                    style={{
+                      color: "var(--tx3)",
+                      fontSize: "16px",
+                      flexShrink: 0,
+                      transform: isExpanded ? "rotate(90deg)" : "none",
+                      transition: "transform 0.15s ease",
+                    }}
+                  >
+                    ›
+                  </span>
 
                   {/* Expand chevron */}
                   <button
