@@ -634,12 +634,21 @@ export default function WorkoutPage() {
         const progress = getCategoryProgress(cat);
 
         return (
-          <div key={cat} style={{ marginBottom: "8px" }}>
+          <div
+            key={cat}
+            style={{
+              margin: "0 16px 12px",
+              background: "var(--s1)",
+              border: "1px solid var(--brd)",
+              borderRadius: "16px",
+              overflow: "hidden",
+            }}
+          >
             {/* Section Header */}
             <div
               style={{
                 background: "var(--s2)",
-                padding: "10px 16px",
+                padding: "12px 16px",
                 borderBottom: "1px solid var(--brd)",
                 display: "flex",
                 alignItems: "center",
@@ -898,12 +907,20 @@ export default function WorkoutPage() {
       })}
 
       {/* ── 5. Supplements Section ── */}
-      <div style={{ marginBottom: "8px" }}>
+      <div
+        style={{
+          margin: "0 16px 12px",
+          background: "var(--s1)",
+          border: "1px solid var(--brd)",
+          borderRadius: "16px",
+          overflow: "hidden",
+        }}
+      >
         {/* Supplements Header */}
         <div
           style={{
             background: "var(--s2)",
-            padding: "10px 16px",
+            padding: "12px 16px",
             borderBottom: "1px solid var(--brd)",
             display: "flex",
             alignItems: "center",
