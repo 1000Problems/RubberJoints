@@ -600,17 +600,22 @@ export default function WorkoutPage() {
         >
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             {weekDays.map((wd) => {
-              const isHighlighted = wd.isToday || wd.isSelected;
+              const selected = wd.date === date;
+              const isHighlighted = wd.isToday || selected;
               let bg = "transparent";
               let labelColor = "var(--tx3)";
               let numColor = "var(--tx)";
               let opacity = 1;
 
-              if (wd.isToday) {
+              if (wd.isToday && selected) {
                 bg = "#34c759";
                 labelColor = "#ffffff";
                 numColor = "#ffffff";
-              } else if (wd.isSelected) {
+              } else if (wd.isToday) {
+                bg = "#34c759";
+                labelColor = "#ffffff";
+                numColor = "#ffffff";
+              } else if (selected) {
                 bg = "var(--acc)";
                 labelColor = "#ffffff";
                 numColor = "#ffffff";
