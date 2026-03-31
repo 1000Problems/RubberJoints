@@ -121,44 +121,41 @@ export default function ProgressPage() {
 
   return (
     <div style={{ background: "var(--bg)", minHeight: "100%" }}>
-      {/* Header */}
+      {/* Header card */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "20px 16px 16px",
+          margin: "16px 16px 12px",
+          background: "var(--s1)",
+          border: "1px solid var(--brd)",
+          borderRadius: "16px",
+          padding: "16px",
+          textAlign: "center",
         }}
       >
         <h1
           style={{
             fontSize: "13px",
             fontWeight: 800,
-            color: "var(--tx)",
-            margin: 0,
+            color: "var(--tx3)",
+            margin: "0 0 8px",
             letterSpacing: "0.12em",
             textTransform: "uppercase",
-            flex: 1,
-            textAlign: "center",
           }}
         >
           Progress
         </h1>
-        <div
+        <span
           style={{
-            background: "var(--acc)",
-            color: "#fff",
+            background: "rgba(74,108,247,0.1)",
+            color: "var(--acc)",
             fontSize: "12px",
-            fontWeight: 700,
+            fontWeight: 600,
             padding: "4px 12px",
             borderRadius: "20px",
-            letterSpacing: "0.02em",
-            position: "absolute",
-            right: "16px",
           }}
         >
           Week {data.weekNumber} of {data.totalWeeks}
-        </div>
+        </span>
       </div>
 
       {/* Stats Grid */}
