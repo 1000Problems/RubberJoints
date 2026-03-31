@@ -284,18 +284,8 @@ export default function ProgressPage() {
                     {m.done && "✓"}
                   </div>
 
-                  {/* Name + date - clickable to expand */}
-                  <button
-                    onClick={() => toggleExpand(m.id)}
-                    style={{
-                      flex: 1,
-                      textAlign: "left",
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                    }}
-                  >
+                  {/* Name + date */}
+                  <div style={{ flex: 1 }}>
                     <div
                       style={{
                         fontSize: "14px",
@@ -312,7 +302,7 @@ export default function ProgressPage() {
                         ? `Achieved ${new Date(m.achievedDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`
                         : "Not yet"}
                     </div>
-                  </button>
+                  </div>
 
                   {/* Done button for incomplete */}
                   {!m.done && (
