@@ -135,11 +135,11 @@ function AIPage() {
     }
   }
 
-  const chips = [
-    "My status",
-    "Today's focus",
-    "Weekly progress",
-    "+ Add to plan",
+  const chips: { label: string; prompt: string }[] = [
+    { label: "My status", prompt: "My status" },
+    { label: "Today's focus", prompt: "Today's focus" },
+    { label: "Weekly progress", prompt: "Weekly progress" },
+    { label: "+ Add to plan", prompt: "I'd like to add something new to my plan — a tool, exercise, or supplement I have access to that isn't currently in my program." },
   ];
 
   return (
@@ -277,16 +277,16 @@ function AIPage() {
               <div className="flex flex-wrap justify-center gap-2">
                 {chips.map((chip) => (
                   <button
-                    key={chip}
-                    onClick={() => sendMessage(chip)}
+                    key={chip.label}
+                    onClick={() => sendMessage(chip.prompt)}
                     className="px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all duration-150"
                     style={{
-                      background: chip.startsWith("+") ? "rgba(74,108,247,0.06)" : "var(--s1)",
-                      border: `1px solid ${chip.startsWith("+") ? "var(--acc)" : "var(--brd)"}`,
-                      color: chip.startsWith("+") ? "var(--acc)" : "var(--tx)",
+                      background: chip.label.startsWith("+") ? "rgba(74,108,247,0.06)" : "var(--s1)",
+                      border: `1px solid ${chip.label.startsWith("+") ? "var(--acc)" : "var(--brd)"}`,
+                      color: chip.label.startsWith("+") ? "var(--acc)" : "var(--tx)",
                     }}
                   >
-                    {chip}
+                    {chip.label}
                   </button>
                 ))}
               </div>
@@ -369,16 +369,16 @@ function AIPage() {
         >
           {chips.map((chip) => (
             <button
-              key={chip}
-              onClick={() => sendMessage(chip)}
+              key={chip.label}
+              onClick={() => sendMessage(chip.prompt)}
               className="shrink-0 px-3 py-1.5 rounded-full text-[12px] font-medium transition-all duration-150"
               style={{
-                background: chip.startsWith("+") ? "rgba(74,108,247,0.06)" : "var(--s1)",
-                border: `1px solid ${chip.startsWith("+") ? "var(--acc)" : "var(--brd)"}`,
-                color: chip.startsWith("+") ? "var(--acc)" : "var(--tx)",
+                background: chip.label.startsWith("+") ? "rgba(74,108,247,0.06)" : "var(--s1)",
+                border: `1px solid ${chip.label.startsWith("+") ? "var(--acc)" : "var(--brd)"}`,
+                color: chip.label.startsWith("+") ? "var(--acc)" : "var(--tx)",
               }}
             >
-              {chip}
+              {chip.label}
             </button>
           ))}
         </div>
