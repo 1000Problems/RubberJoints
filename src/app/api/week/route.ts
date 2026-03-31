@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
   }
 
   const enrollStart = utcDate(enrollment.startDate);
-  const todayUTC = utcDate(new Date());
+  const todayPacificStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const todayUTC = new Date(todayPacificStr + "T00:00:00Z");
   const thisMonday = getMonday(todayUTC);
   const targetMonday = addDaysUTC(thisMonday, offset * 7);
   const targetSunday = addDaysUTC(targetMonday, 6);

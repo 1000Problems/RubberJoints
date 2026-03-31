@@ -1,13 +1,11 @@
 // All date logic uses Pacific timezone to match the original app
-const TZ = "America/Los_Angeles";
+
+export function todayPacificStr(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+}
 
 export function todayPacific(): Date {
-  const now = new Date();
-  const pacific = new Date(
-    now.toLocaleString("en-US", { timeZone: TZ })
-  );
-  pacific.setHours(0, 0, 0, 0);
-  return pacific;
+  return new Date(todayPacificStr() + "T00:00:00Z");
 }
 
 export function formatDate(date: Date): string {
@@ -16,6 +14,6 @@ export function formatDate(date: Date): string {
 
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date);
-  result.setDate(result.getDate() + days);
+  result.setUTCDate(result.getUTCDate() + days);
   return result;
 }

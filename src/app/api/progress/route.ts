@@ -26,7 +26,8 @@ export async function GET() {
   if (!session)
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
-  const todayUTC = utcDate(new Date());
+  const todayPacificStr = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const todayUTC = new Date(todayPacificStr + "T00:00:00Z");
   const thisMonday = getMonday(todayUTC);
   const thisSunday = addDaysUTC(thisMonday, 6);
 

@@ -5,14 +5,18 @@ import { getSession } from "@/lib/auth";
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const DAY_SHORT = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
+function todayPacificStr(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+}
+
 export async function GET(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
 
+  const todayStr = todayPacificStr();
   const dateParam = req.nextUrl.searchParams.get("date");
-  const date = dateParam
-    ? new Date(dateParam + "T00:00:00Z")
-    : new Date(new Date().toISOString().split("T")[0] + "T00:00:00Z");
+  const dateStr = dateParam || todayStr;
+  const date = new Date(dateStr + "T00:00:00Z");
 
   const [plan, supplements, dailyChecks] = await Promise.all([
     prisma.userDailyPlan.findMany({
@@ -43,18 +47,11 @@ export async function GET(req: NextRequest) {
   if (dayType === "rest" || plan.length === 0) {
     dayLabel = `${dayName} . Rest Day`;
   } else {
-    const totalExercises = plan.length;
-    const estMinutes = totalExercises * 5;
     dayLabel = `${dayName} . Training Session`;
-    if (estMinutes > 0) {
-      dayLabel = `${dayName} . Training Session`;
-    }
   }
 
   // Build week days array (Mon-Sun around the selected date)
-  const todayStr = new Date().toISOString().split("T")[0];
   const selectedDay = date.getUTCDay(); // 0=Sun
-  // Find the Monday of this week
   const mondayOffset = selectedDay === 0 ? -6 : 1 - selectedDay;
   const monday = new Date(date);
   monday.setUTCDate(monday.getUTCDate() + mondayOffset);
@@ -69,12 +66,12 @@ export async function GET(req: NextRequest) {
       dayLabel: DAY_SHORT[d.getUTCDay()],
       dayNumber: d.getUTCDate(),
       isToday: dStr === todayStr,
-      isSelected: dStr === (dateParam || todayStr),
+      isSelected: dStr === dateStr,
       isPast: dStr < todayStr,
     });
   }
 
-  const isFuture = (dateParam || todayStr) > todayStr;
+  const isFuture = dateStr > todayStr;
 
   return NextResponse.json({
     plan,

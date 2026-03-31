@@ -6,10 +6,10 @@ import { useEffect } from "react";
 
 const navItems = [
   { href: "/ai", label: "AI", icon: "ai" },
-  { href: "/workout", label: "Workout", icon: "workout" },
-  { href: "/week", label: "Week", icon: "week" },
-  { href: "/progress", label: "Progress", icon: "progress" },
-  { href: "/settings", label: "Settings", icon: "settings" },
+  { href: "/workout", label: "WORKOUT", icon: "workout" },
+  { href: "/week", label: "WEEK", icon: "week" },
+  { href: "/progress", label: "PROGRESS", icon: "progress" },
+  { href: "/settings", label: "SETTINGS", icon: "settings" },
 ];
 
 function NavIcon({ name, active }: { name: string; active: boolean }) {

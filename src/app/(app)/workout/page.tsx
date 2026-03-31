@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 /* ── Types ── */
 
@@ -87,15 +88,19 @@ const CATEGORIES = ["warmup_tool", "mobility", "recovery_tool"];
 /* ── Component ── */
 
 export default function WorkoutPage() {
+  const router = useRouter();
   const [plan, setPlan] = useState<PlanItem[]>([]);
   const [supplements, setSupplements] = useState<SupplementItem[]>([]);
   const [checks, setChecks] = useState<CheckState>({});
-  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
+  const [date, setDate] = useState(() =>
+    new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
+  );
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [dayLabel, setDayLabel] = useState("");
   const [weekDays, setWeekDays] = useState<WeekDay[]>([]);
   const [isFuture, setIsFuture] = useState(false);
+  const [username, setUsername] = useState("");
 
   // Picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -130,6 +135,16 @@ export default function WorkoutPage() {
   useEffect(() => {
     loadDay();
   }, [loadDay]);
+
+  // Fetch username
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.user?.username) setUsername(data.user.username);
+      })
+      .catch(() => {});
+  }, []);
 
   // Session auto-logging: log progress when leaving the page
   const logSession = useCallback(() => {
@@ -306,6 +321,15 @@ export default function WorkoutPage() {
     }
   }
 
+  async function handleSignOut() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // ignore
+    }
+    router.push("/login");
+  }
+
   if (loading) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "256px" }}>
@@ -329,13 +353,43 @@ export default function WorkoutPage() {
 
   return (
     <div>
+      {/* ── 0. Username / Sign out bar ── */}
+      {username && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "8px 16px 0",
+            fontSize: "0.8rem",
+            color: "var(--tx2)",
+          }}
+        >
+          <span>{username}</span>
+          <button
+            onClick={handleSignOut}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              fontSize: "0.8rem",
+              color: "var(--tx2)",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+
       {/* ── 1. Day Navigation ── */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "12px 16px",
+          padding: "8px 16px",
           position: "sticky",
           top: 0,
           zIndex: 10,
@@ -391,7 +445,7 @@ export default function WorkoutPage() {
       {isFuture && (
         <div
           style={{
-            margin: "0 16px 12px",
+            margin: "0 16px 8px",
             padding: "8px 14px",
             borderRadius: "10px",
             background: "var(--s2)",
@@ -412,7 +466,7 @@ export default function WorkoutPage() {
           borderRadius: "16px",
           border: "1px solid var(--brd)",
           padding: "16px",
-          margin: "0 16px 12px",
+          margin: "0 16px 8px",
         }}
       >
         <div
@@ -503,11 +557,11 @@ export default function WorkoutPage() {
             background: "var(--s1)",
             borderRadius: "16px",
             border: "1px solid var(--brd)",
-            padding: "12px 8px",
-            margin: "0 16px 12px",
+            padding: "8px 4px",
+            margin: "0 16px 8px",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <div style={{ display: "flex", justifyContent: "space-around" }}>
             {weekDays.map((wd) => {
               let bg = "transparent";
               let textColor = "var(--tx)";
@@ -532,10 +586,10 @@ export default function WorkoutPage() {
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    gap: "4px",
-                    padding: "6px 8px",
-                    borderRadius: "12px",
-                    minWidth: "38px",
+                    gap: "2px",
+                    padding: "4px 6px",
+                    borderRadius: "10px",
+                    minWidth: "34px",
                     textAlign: "center",
                     background: bg,
                     border: "none",
@@ -575,12 +629,12 @@ export default function WorkoutPage() {
         const progress = getCategoryProgress(cat);
 
         return (
-          <div key={cat} style={{ marginBottom: "12px" }}>
+          <div key={cat} style={{ marginBottom: "8px" }}>
             {/* Section Header */}
             <div
               style={{
                 background: "var(--s2)",
-                padding: "12px 16px",
+                padding: "10px 16px",
                 borderBottom: "1px solid var(--brd)",
                 display: "flex",
                 alignItems: "center",
@@ -683,7 +737,7 @@ export default function WorkoutPage() {
                           display: "flex",
                           alignItems: "center",
                           gap: "12px",
-                          padding: "14px 16px",
+                          padding: "12px 16px",
                           background: "var(--s1)",
                         }}
                       >
@@ -693,7 +747,7 @@ export default function WorkoutPage() {
                             style={{
                               width: "26px",
                               height: "26px",
-                              borderRadius: "8px",
+                              borderRadius: "50%",
                               border: "2px dashed var(--brd)",
                               opacity: 0.5,
                               flexShrink: 0,
@@ -705,7 +759,7 @@ export default function WorkoutPage() {
                             style={{
                               width: "26px",
                               height: "26px",
-                              borderRadius: "8px",
+                              borderRadius: "50%",
                               border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
                               background: checked ? "var(--grn)" : "transparent",
                               color: "#ffffff",
@@ -839,12 +893,12 @@ export default function WorkoutPage() {
       })}
 
       {/* ── 5. Supplements Section ── */}
-      <div style={{ marginBottom: "12px" }}>
+      <div style={{ marginBottom: "8px" }}>
         {/* Supplements Header */}
         <div
           style={{
             background: "var(--s2)",
-            padding: "12px 16px",
+            padding: "10px 16px",
             borderBottom: "1px solid var(--brd)",
             display: "flex",
             alignItems: "center",
@@ -969,9 +1023,9 @@ export default function WorkoutPage() {
                       {isFuture ? (
                         <div
                           style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "6px",
+                            width: "26px",
+                            height: "26px",
+                            borderRadius: "50%",
                             border: "2px dashed var(--brd)",
                             opacity: 0.5,
                             flexShrink: 0,
@@ -981,13 +1035,13 @@ export default function WorkoutPage() {
                         <button
                           onClick={() => toggleCheck("supplement", item.supplementId, 0)}
                           style={{
-                            width: "24px",
-                            height: "24px",
-                            borderRadius: "6px",
+                            width: "26px",
+                            height: "26px",
+                            borderRadius: "50%",
                             border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
                             background: checked ? "var(--grn)" : "transparent",
                             color: "#ffffff",
-                            fontSize: "12px",
+                            fontSize: "14px",
                             fontWeight: 700,
                             display: "flex",
                             alignItems: "center",
