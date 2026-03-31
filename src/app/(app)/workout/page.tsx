@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+
+/* ── Types ── */
 
 interface PlanItem {
   id: number;
@@ -32,20 +34,46 @@ interface SupplementItem {
   };
 }
 
+interface WeekDay {
+  date: string;
+  dayLabel: string;
+  dayNumber: number;
+  isToday: boolean;
+  isSelected: boolean;
+  isPast: boolean;
+}
+
 interface CheckState {
   [key: string]: boolean;
 }
 
+interface PickerExercise {
+  id: string;
+  name: string;
+  category: string;
+  targets: string | null;
+  defaultRx: string | null;
+}
+
+interface PickerSupplement {
+  id: string;
+  name: string;
+  dose: string | null;
+  timeGroup: string;
+}
+
+/* ── Constants ── */
+
 const categoryColors: Record<string, string> = {
-  warmup_tool: "var(--org)",
-  mobility: "var(--grn)",
-  recovery_tool: "var(--acc)",
+  warmup_tool: "#ff9500",
+  mobility: "#34c759",
+  recovery_tool: "#4a6cf7",
 };
 
 const categoryLabels: Record<string, string> = {
-  warmup_tool: "WARM-UP",
-  mobility: "MOBILITY",
-  recovery_tool: "RECOVERY",
+  warmup_tool: "Warm-up",
+  mobility: "Mobility",
+  recovery_tool: "Recovery",
 };
 
 const suppGroupLabels: Record<string, string> = {
@@ -54,6 +82,10 @@ const suppGroupLabels: Record<string, string> = {
   pm: "EVENING",
 };
 
+const CATEGORIES = ["warmup_tool", "mobility", "recovery_tool"];
+
+/* ── Component ── */
+
 export default function WorkoutPage() {
   const [plan, setPlan] = useState<PlanItem[]>([]);
   const [supplements, setSupplements] = useState<SupplementItem[]>([]);
@@ -61,6 +93,20 @@ export default function WorkoutPage() {
   const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [dayLabel, setDayLabel] = useState("");
+  const [weekDays, setWeekDays] = useState<WeekDay[]>([]);
+
+  // Picker state
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerType, setPickerType] = useState<"exercise" | "supplement">("exercise");
+  const [pickerCategory, setPickerCategory] = useState("");
+  const [pickerTimeGroup, setPickerTimeGroup] = useState("");
+  const [pickerItems, setPickerItems] = useState<(PickerExercise | PickerSupplement)[]>([]);
+  const [pickerLoading, setPickerLoading] = useState(false);
+
+  // Swipe refs
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
 
   const loadDay = useCallback(async () => {
     setLoading(true);
@@ -70,6 +116,8 @@ export default function WorkoutPage() {
       setPlan(data.plan || []);
       setSupplements(data.supplements || []);
       setChecks(data.checks || {});
+      setDayLabel(data.dayLabel || "");
+      setWeekDays(data.weekDays || []);
     } catch {
       // ignore
     } finally {
@@ -77,7 +125,32 @@ export default function WorkoutPage() {
     }
   }, [date]);
 
-  useEffect(() => { loadDay(); }, [loadDay]);
+  useEffect(() => {
+    loadDay();
+  }, [loadDay]);
+
+  // Swipe gestures
+  useEffect(() => {
+    function handleTouchStart(e: TouchEvent) {
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
+    }
+    function handleTouchEnd(e: TouchEvent) {
+      const dx = e.changedTouches[0].clientX - touchStartX.current;
+      const dy = Math.abs(e.changedTouches[0].clientY - touchStartY.current);
+      if (Math.abs(dx) > 80 && dy < 100) {
+        if (dx > 0) changeDay(-1);
+        else changeDay(1);
+      }
+    }
+    document.addEventListener("touchstart", handleTouchStart, { passive: true });
+    document.addEventListener("touchend", handleTouchEnd, { passive: true });
+    return () => {
+      document.removeEventListener("touchstart", handleTouchStart);
+      document.removeEventListener("touchend", handleTouchEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date]);
 
   async function toggleCheck(itemType: string, itemId: string, stepIndex: number) {
     const key = `${itemType}:${itemId}:${stepIndex}`;
@@ -113,322 +186,937 @@ export default function WorkoutPage() {
     return { done, total: supplements.length, pct: Math.round((done / supplements.length) * 100) };
   }
 
+  function getDayDisplayLabel() {
+    const today = new Date().toISOString().split("T")[0];
+    if (date === today) return "Today";
+    const d = new Date(date + "T12:00:00");
+    return d.toLocaleDateString("en-US", { weekday: "long" });
+  }
+
+  // Picker helpers
+  async function openExercisePicker(category: string) {
+    setPickerType("exercise");
+    setPickerCategory(category);
+    setPickerOpen(true);
+    setPickerLoading(true);
+    try {
+      const res = await fetch(`/api/exercises?category=${category}`);
+      const data = await res.json();
+      setPickerItems(data.exercises || []);
+    } catch {
+      setPickerItems([]);
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  async function openSupplementPicker(timeGroup: string) {
+    setPickerType("supplement");
+    setPickerTimeGroup(timeGroup);
+    setPickerOpen(true);
+    setPickerLoading(true);
+    try {
+      const res = await fetch(`/api/supplements?timeGroup=${timeGroup}`);
+      const data = await res.json();
+      setPickerItems(data.supplements || []);
+    } catch {
+      setPickerItems([]);
+    } finally {
+      setPickerLoading(false);
+    }
+  }
+
+  async function selectExercise(exerciseId: string) {
+    setPickerOpen(false);
+    try {
+      await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exerciseId, date }),
+      });
+      loadDay();
+    } catch {
+      // ignore
+    }
+  }
+
+  async function selectSupplement(supplementId: string, timeGroup: string) {
+    setPickerOpen(false);
+    try {
+      await fetch("/api/supplements", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ supplementId, timeGroup }),
+      });
+      loadDay();
+    } catch {
+      // ignore
+    }
+  }
+
+  async function removeExercise(exerciseId: string) {
+    try {
+      await fetch("/api/plan", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ exerciseId }),
+      });
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        next.delete(exerciseId);
+        return next;
+      });
+      loadDay();
+    } catch {
+      // ignore
+    }
+  }
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "256px" }}>
         <div style={{ color: "var(--tx3)", fontSize: "13px" }}>Loading...</div>
       </div>
     );
   }
 
-  const categories = ["warmup_tool", "mobility", "recovery_tool"];
   const suppProgress = getSuppProgress();
+  const existingExerciseIds = new Set(plan.map((p) => p.exerciseId));
+
+  // Progress bars data
+  const progressRows: { key: string; label: string; color: string; done: number; total: number; pct: number }[] = [];
+  for (const cat of CATEGORIES) {
+    const prog = getCategoryProgress(cat);
+    progressRows.push({ key: cat, label: categoryLabels[cat], color: categoryColors[cat], ...prog });
+  }
+  if (supplements.length > 0) {
+    progressRows.push({ key: "vitamins", label: "Vitamins", color: "#ffcc00", ...suppProgress });
+  }
 
   return (
     <div>
-      {/* Day navigation */}
+      {/* ── 1. Day Navigation ── */}
       <div
-        className="flex items-center justify-between px-4 py-3 sticky top-0 z-10"
-        style={{ background: "var(--bg)" }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "12px 16px",
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          background: "var(--bg)",
+        }}
       >
         <button
           onClick={() => changeDay(-1)}
-          className="w-10 h-10 flex items-center justify-center rounded-xl text-[22px] font-bold"
-          style={{ background: "var(--s1)", border: "1px solid var(--brd)", color: "var(--tx)" }}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "12px",
+            background: "var(--s1)",
+            border: "1px solid var(--brd)",
+            color: "var(--tx)",
+            fontSize: "22px",
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
         >
-          ‹
+          &#8249;
         </button>
-        <div className="text-center">
-          <div className="text-[16px] font-bold" style={{ color: "var(--tx)" }}>
-            {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
-              weekday: "long",
-              month: "short",
-              day: "numeric",
-            })}
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--tx)" }}>
+            {getDayDisplayLabel()}
           </div>
         </div>
         <button
           onClick={() => changeDay(1)}
-          className="w-10 h-10 flex items-center justify-center rounded-xl text-[22px] font-bold"
-          style={{ background: "var(--s1)", border: "1px solid var(--brd)", color: "var(--tx)" }}
+          style={{
+            width: "40px",
+            height: "40px",
+            borderRadius: "12px",
+            background: "var(--s1)",
+            border: "1px solid var(--brd)",
+            color: "var(--tx)",
+            fontSize: "22px",
+            fontWeight: 700,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
         >
-          ›
+          &#8250;
         </button>
       </div>
 
-      {/* Activity Summary Card */}
+      {/* ── 2. Activity Summary Card ── */}
       <div
-        className="mx-4 mb-3 p-4 rounded-2xl"
-        style={{ background: "var(--s1)", border: "1px solid var(--brd)" }}
+        style={{
+          background: "var(--s1)",
+          borderRadius: "16px",
+          border: "1px solid var(--brd)",
+          padding: "16px",
+          margin: "0 16px 12px",
+        }}
       >
         <div
-          className="text-[11px] font-extrabold uppercase mb-3"
-          style={{ letterSpacing: "0.1em", color: "var(--tx3)" }}
+          style={{
+            fontSize: "11px",
+            fontWeight: 800,
+            textTransform: "uppercase",
+            letterSpacing: "0.1em",
+            color: "var(--tx3)",
+            marginBottom: "4px",
+          }}
         >
-          TODAY&apos;S ACTIVITY
+          Today&apos;s Workout
         </div>
-        <div className="flex flex-col gap-2.5">
-          {categories.map((cat) => {
-            const { done, total, pct } = getCategoryProgress(cat);
-            if (total === 0) return null;
-            return (
-              <div key={cat} className="flex items-center gap-3">
-                <div className="w-20 text-[12px] font-bold" style={{ color: categoryColors[cat] }}>
-                  {categoryLabels[cat]}
-                </div>
-                <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "var(--s3)" }}>
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${pct}%`,
-                      background: categoryColors[cat],
-                      transition: "width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
-                    }}
-                  />
-                </div>
-                <div className="w-9 text-right text-[12px] font-bold" style={{ color: "var(--tx2)" }}>
-                  {done}/{total}
-                </div>
+        <div
+          style={{
+            fontSize: "13px",
+            color: "var(--tx2)",
+            marginBottom: "14px",
+          }}
+        >
+          {dayLabel}
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {progressRows.map((row) => (
+            <div key={row.key} style={{ display: "flex", alignItems: "center" }}>
+              <div
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: row.color,
+                  marginRight: "8px",
+                  flexShrink: 0,
+                }}
+              />
+              <div
+                style={{
+                  width: "80px",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--tx)",
+                  flexShrink: 0,
+                }}
+              >
+                {row.label}
               </div>
-            );
-          })}
-          {suppProgress.total > 0 && (
-            <div className="flex items-center gap-3">
-              <div className="w-20 text-[12px] font-bold" style={{ color: "var(--yel)" }}>
-                VITAMINS
-              </div>
-              <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "var(--s3)" }}>
+              <div
+                style={{
+                  flex: 1,
+                  height: "10px",
+                  background: "var(--s3)",
+                  borderRadius: "5px",
+                  overflow: "hidden",
+                }}
+              >
                 <div
-                  className="h-full rounded-full"
                   style={{
-                    width: `${suppProgress.pct}%`,
-                    background: "var(--yel)",
+                    height: "100%",
+                    width: `${row.pct}%`,
+                    background: row.color,
+                    borderRadius: "5px",
                     transition: "width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
                   }}
                 />
               </div>
-              <div className="w-9 text-right text-[12px] font-bold" style={{ color: "var(--tx2)" }}>
-                {suppProgress.done}/{suppProgress.total}
+              <div
+                style={{
+                  width: "36px",
+                  textAlign: "right",
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--tx2)",
+                  flexShrink: 0,
+                }}
+              >
+                {row.done}/{row.total}
               </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* Exercise sections by category */}
-      {categories.map((cat) => {
-        const items = plan.filter((p) => p.category === cat);
-        if (items.length === 0) return null;
-        return (
-          <div key={cat} className="mb-3">
-            {/* Section header */}
-            <div
-              className="flex items-center gap-2 px-4 py-2.5"
-              style={{ background: "var(--s2)", borderBottom: "1px solid var(--brd)" }}
-            >
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ background: categoryColors[cat] }}
-              />
-              <span
-                className="text-[11px] font-bold uppercase flex-1"
-                style={{ letterSpacing: "1px", color: "var(--tx3)" }}
-              >
-                {categoryLabels[cat]}
-              </span>
-              <span className="text-[12px] font-bold" style={{ color: "var(--tx3)" }}>
-                {getCategoryProgress(cat).done}/{getCategoryProgress(cat).total}
-              </span>
-            </div>
+      {/* ── 3. Weekly Calendar Strip ── */}
+      {weekDays.length > 0 && (
+        <div
+          style={{
+            background: "var(--s1)",
+            borderRadius: "16px",
+            border: "1px solid var(--brd)",
+            padding: "12px 8px",
+            margin: "0 16px 12px",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            {weekDays.map((wd) => {
+              let bg = "transparent";
+              let textColor = "var(--tx)";
+              let opacity = 1;
 
-            {/* Exercise items */}
-            <div style={{ background: "var(--s1)" }}>
-              {items.map((item) => {
-                const key = `step:${item.exerciseId}:0`;
-                const checked = checks[key] || false;
-                const isExpanded = expanded.has(item.exerciseId);
-                return (
-                  <div key={item.id} style={{ borderBottom: "1px solid var(--brd)" }}>
-                    <div className="flex items-center gap-3 px-4 py-3.5">
-                      {/* Checkbox */}
-                      <button
-                        onClick={() => toggleCheck("step", item.exerciseId, 0)}
-                        className="w-[26px] h-[26px] rounded-lg flex items-center justify-center shrink-0"
-                        style={{
-                          border: checked ? "none" : "2px solid var(--brd)",
-                          background: checked ? "var(--grn)" : "transparent",
-                          color: "white",
-                          fontSize: "14px",
-                          fontWeight: 700,
-                        }}
-                      >
-                        {checked && "✓"}
-                      </button>
+              if (wd.isToday) {
+                bg = "#34c759";
+                textColor = "#ffffff";
+              } else if (wd.isSelected) {
+                bg = "var(--acc)";
+                textColor = "#ffffff";
+              }
+              if (wd.isPast && !wd.isToday && !wd.isSelected) {
+                opacity = 0.5;
+              }
 
-                      {/* Name + rx */}
-                      <button
-                        onClick={() => {
-                          const next = new Set(expanded);
-                          isExpanded ? next.delete(item.exerciseId) : next.add(item.exerciseId);
-                          setExpanded(next);
-                        }}
-                        className="flex-1 text-left"
-                      >
-                        <div
-                          className="text-[15px]"
-                          style={{
-                            color: checked ? "var(--tx3)" : "var(--tx)",
-                            textDecoration: checked ? "line-through" : "none",
-                            opacity: checked ? 0.7 : 1,
-                          }}
-                        >
-                          {item.exercise.name}
-                        </div>
-                        {item.rx && (
-                          <div className="text-[13px]" style={{ color: "var(--tx2)" }}>
-                            {item.rx}
-                          </div>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Expanded detail */}
-                    {isExpanded && (
-                      <div
-                        className="px-4 pb-3 text-[13px]"
-                        style={{
-                          paddingLeft: "54px",
-                          background: "var(--s2)",
-                          color: "var(--tx2)",
-                        }}
-                      >
-                        {item.exercise.targets && (
-                          <p className="mb-1">
-                            <span className="font-semibold" style={{ color: "var(--acc)" }}>Targets:</span>{" "}
-                            {item.exercise.targets}
-                          </p>
-                        )}
-                        {item.exercise.description && <p className="mb-1">{item.exercise.description}</p>}
-                        {item.exercise.cues && (
-                          <p className="mb-1">
-                            <span className="font-semibold" style={{ color: "var(--acc)" }}>Cues:</span>{" "}
-                            {item.exercise.cues}
-                          </p>
-                        )}
-                        {item.exercise.warning && (
-                          <p className="mb-1" style={{ color: "var(--org)" }}>
-                            <span className="font-semibold">⚠ Warning:</span> {item.exercise.warning}
-                          </p>
-                        )}
-                        {/* YouTube demo link */}
-                        <a
-                          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(item.exercise.name + " exercise demo")}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white"
-                          style={{ background: "#ff0000" }}
-                        >
-                          ▶ YouTube Demo
-                        </a>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        );
-      })}
-
-      {/* Supplements */}
-      {supplements.length > 0 && (
-        <div className="mb-3">
-          <div
-            className="flex items-center gap-2 px-4 py-2.5"
-            style={{ background: "var(--s2)", borderBottom: "1px solid var(--brd)" }}
-          >
-            <div className="w-2 h-2 rounded-full" style={{ background: "var(--yel)" }} />
-            <span
-              className="text-[11px] font-bold uppercase flex-1"
-              style={{ letterSpacing: "1px", color: "var(--tx3)" }}
-            >
-              SUPPLEMENTS
-            </span>
-            <span className="text-[12px] font-bold" style={{ color: "var(--tx3)" }}>
-              {suppProgress.done}/{suppProgress.total}
-            </span>
-          </div>
-
-          <div style={{ background: "var(--s1)" }}>
-            {["am", "mid", "pm"].map((group) => {
-              const items = supplements.filter((s) => s.timeGroup === group);
-              if (items.length === 0) return null;
               return (
-                <div key={group}>
+                <button
+                  key={wd.date}
+                  onClick={() => setDate(wd.date)}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: "4px",
+                    padding: "6px 8px",
+                    borderRadius: "12px",
+                    minWidth: "38px",
+                    textAlign: "center",
+                    background: bg,
+                    border: "none",
+                    cursor: "pointer",
+                    opacity,
+                  }}
+                >
                   <div
-                    className="px-4 py-1.5 text-[11px] font-bold uppercase"
                     style={{
-                      background: "var(--s2)",
-                      letterSpacing: "0.05em",
-                      color: "var(--tx3)",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      color: textColor,
                     }}
                   >
-                    {suppGroupLabels[group]}
+                    {wd.dayLabel}
                   </div>
-                  {items.map((item) => {
-                    const key = `supplement:${item.supplementId}:0`;
-                    const checked = checks[key] || false;
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-3 px-4 py-3"
-                        style={{ borderBottom: "1px solid var(--brd)" }}
-                      >
-                        <button
-                          onClick={() => toggleCheck("supplement", item.supplementId, 0)}
-                          className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
-                          style={{
-                            border: checked ? "none" : "2px solid var(--brd)",
-                            background: checked ? "var(--grn)" : "transparent",
-                            color: "white",
-                            fontSize: "12px",
-                            fontWeight: 700,
-                          }}
-                        >
-                          {checked && "✓"}
-                        </button>
-                        <div className="flex-1">
-                          <div
-                            className="text-[14px]"
-                            style={{
-                              color: checked ? "var(--tx3)" : "var(--tx)",
-                              textDecoration: checked ? "line-through" : "none",
-                              opacity: checked ? 0.7 : 1,
-                            }}
-                          >
-                            {item.supplement.name}
-                          </div>
-                          {item.supplement.dose && (
-                            <div className="text-[12px]" style={{ color: "var(--tx3)" }}>
-                              {item.supplement.dose}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                  <div
+                    style={{
+                      fontSize: "16px",
+                      fontWeight: 700,
+                      color: textColor,
+                    }}
+                  >
+                    {wd.dayNumber}
+                  </div>
+                </button>
               );
             })}
           </div>
         </div>
       )}
 
-      {plan.length === 0 && supplements.length === 0 && (
-        <div className="text-center py-16 text-[13px]" style={{ color: "var(--tx3)" }}>
-          No exercises planned for this day
+      {/* ── 4. Exercise Sections ── */}
+      {CATEGORIES.map((cat) => {
+        const items = plan.filter((p) => p.category === cat);
+        const progress = getCategoryProgress(cat);
+
+        return (
+          <div key={cat} style={{ marginBottom: "12px" }}>
+            {/* Section Header */}
+            <div
+              style={{
+                background: "var(--s2)",
+                padding: "12px 16px",
+                borderBottom: "1px solid var(--brd)",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <div
+                style={{
+                  width: "8px",
+                  height: "8px",
+                  borderRadius: "50%",
+                  background: categoryColors[cat],
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 700,
+                  textTransform: "uppercase",
+                  letterSpacing: "1px",
+                  color: "var(--tx3)",
+                }}
+              >
+                {categoryLabels[cat]}
+              </span>
+              <span
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 700,
+                  color: "var(--tx3)",
+                  marginLeft: "auto",
+                }}
+              >
+                {progress.done}/{progress.total}
+              </span>
+              {/* Ask AI button */}
+              {items.length > 0 && (
+                <a
+                  href={`/ai?prompt=${encodeURIComponent(`Help me with my ${categoryLabels[cat]} exercises`)}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--tx3)",
+                    textDecoration: "none",
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                  </svg>
+                </a>
+              )}
+              {/* Add exercise button */}
+              <button
+                onClick={() => openExercisePicker(cat)}
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "50%",
+                  border: "2px solid var(--brd)",
+                  background: "transparent",
+                  color: "var(--tx3)",
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                }}
+              >
+                +
+              </button>
+            </div>
+
+            {/* Exercise Items or Empty State */}
+            <div style={{ background: "var(--s1)" }}>
+              {items.length === 0 ? (
+                <div
+                  style={{
+                    padding: "20px 16px",
+                    textAlign: "center",
+                    fontStyle: "italic",
+                    fontSize: "13px",
+                    color: "var(--tx3)",
+                  }}
+                >
+                  Tap + to add exercises
+                </div>
+              ) : (
+                items.map((item) => {
+                  const key = `step:${item.exerciseId}:0`;
+                  const checked = checks[key] || false;
+                  const isExpanded = expanded.has(item.exerciseId);
+                  return (
+                    <div key={item.id} style={{ borderBottom: "1px solid var(--brd)" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "12px",
+                          padding: "14px 16px",
+                          background: "var(--s1)",
+                        }}
+                      >
+                        {/* Checkbox */}
+                        <button
+                          onClick={() => toggleCheck("step", item.exerciseId, 0)}
+                          style={{
+                            width: "26px",
+                            height: "26px",
+                            borderRadius: "8px",
+                            border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
+                            background: checked ? "var(--grn)" : "transparent",
+                            color: "#ffffff",
+                            fontSize: "14px",
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {checked && "\u2713"}
+                        </button>
+
+                        {/* Name + target area */}
+                        <button
+                          onClick={() => {
+                            const next = new Set(expanded);
+                            isExpanded ? next.delete(item.exerciseId) : next.add(item.exerciseId);
+                            setExpanded(next);
+                          }}
+                          style={{
+                            flex: 1,
+                            textAlign: "left",
+                            background: "none",
+                            border: "none",
+                            padding: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: "15px",
+                              color: checked ? "var(--tx3)" : "var(--tx)",
+                              textDecoration: checked ? "line-through" : "none",
+                              opacity: checked ? 0.7 : 1,
+                            }}
+                          >
+                            {item.exercise.name}
+                          </div>
+                          {item.exercise.targets && (
+                            <div style={{ fontSize: "12px", color: "var(--tx3)" }}>
+                              {item.exercise.targets}
+                            </div>
+                          )}
+                        </button>
+
+                        {/* Reps */}
+                        {item.rx && (
+                          <div style={{ fontSize: "13px", color: "var(--tx2)", flexShrink: 0 }}>
+                            {item.rx}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Expanded detail */}
+                      {isExpanded && (
+                        <div
+                          style={{
+                            background: "var(--s2)",
+                            padding: "0 16px 14px 54px",
+                            fontSize: "13px",
+                            color: "var(--tx2)",
+                          }}
+                        >
+                          {item.exercise.description && (
+                            <p style={{ margin: "0 0 8px" }}>{item.exercise.description}</p>
+                          )}
+                          {item.exercise.cues && (
+                            <ul style={{ margin: "0 0 8px", paddingLeft: "0", listStyle: "none" }}>
+                              {item.exercise.cues.split("\n").filter(Boolean).map((cue, i) => (
+                                <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: "8px", marginBottom: "4px" }}>
+                                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "var(--acc)", flexShrink: 0, marginTop: "5px" }} />
+                                  <span>{cue}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {item.exercise.warning && (
+                            <p style={{ margin: "0 0 8px", color: "#ff9500" }}>
+                              <span style={{ fontWeight: 600 }}>&#9888; Warning:</span> {item.exercise.warning}
+                            </p>
+                          )}
+                          <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+                            <a
+                              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(item.exercise.name + " exercise demo")}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                padding: "6px 12px",
+                                borderRadius: "8px",
+                                background: "#ff0000",
+                                color: "#ffffff",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                textDecoration: "none",
+                              }}
+                            >
+                              &#9654; YouTube Demo
+                            </a>
+                            <button
+                              onClick={() => removeExercise(item.exerciseId)}
+                              style={{
+                                padding: "6px 12px",
+                                borderRadius: "8px",
+                                background: "transparent",
+                                border: "1px solid #dddddd",
+                                color: "#999999",
+                                fontSize: "12px",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ── 5. Supplements Section ── */}
+      <div style={{ marginBottom: "12px" }}>
+        {/* Supplements Header */}
+        <div
+          style={{
+            background: "var(--s2)",
+            padding: "12px 16px",
+            borderBottom: "1px solid var(--brd)",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}
+        >
+          <div
+            style={{
+              width: "8px",
+              height: "8px",
+              borderRadius: "50%",
+              background: "#ffcc00",
+              flexShrink: 0,
+            }}
+          />
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "1px",
+              color: "var(--tx3)",
+            }}
+          >
+            Vitamins
+          </span>
+          <span
+            style={{
+              fontSize: "12px",
+              fontWeight: 700,
+              color: "var(--tx3)",
+              marginLeft: "auto",
+            }}
+          >
+            {suppProgress.done}/{suppProgress.total}
+          </span>
+          {/* Ask AI button */}
+          {supplements.length > 0 && (
+            <a
+              href={`/ai?prompt=${encodeURIComponent("Help me with my supplement routine")}`}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--tx3)",
+                textDecoration: "none",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </a>
+          )}
+        </div>
+
+        {/* Supplement groups */}
+        <div style={{ background: "var(--s1)" }}>
+          {(["am", "mid", "pm"] as const).map((group) => {
+            const items = supplements.filter((s) => s.timeGroup === group);
+            return (
+              <div key={group}>
+                {/* Time group header */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "6px 16px",
+                    background: "var(--s2)",
+                    borderBottom: "1px solid var(--brd)",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.05em",
+                      color: "var(--tx3)",
+                    }}
+                  >
+                    {suppGroupLabels[group]}
+                  </span>
+                  <button
+                    onClick={() => openSupplementPicker(group)}
+                    style={{
+                      width: "28px",
+                      height: "28px",
+                      borderRadius: "50%",
+                      border: "2px solid var(--brd)",
+                      background: "transparent",
+                      color: "var(--tx3)",
+                      fontSize: "18px",
+                      fontWeight: 700,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      lineHeight: 1,
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+
+                {/* Supplement items */}
+                {items.map((item) => {
+                  const key = `supplement:${item.supplementId}:0`;
+                  const checked = checks[key] || false;
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "12px 16px",
+                        borderBottom: "1px solid var(--brd)",
+                      }}
+                    >
+                      <button
+                        onClick={() => toggleCheck("supplement", item.supplementId, 0)}
+                        style={{
+                          width: "24px",
+                          height: "24px",
+                          borderRadius: "6px",
+                          border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
+                          background: checked ? "var(--grn)" : "transparent",
+                          color: "#ffffff",
+                          fontSize: "12px",
+                          fontWeight: 700,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {checked && "\u2713"}
+                      </button>
+                      <div style={{ flex: 1 }}>
+                        <div
+                          style={{
+                            fontSize: "14px",
+                            color: checked ? "var(--tx3)" : "var(--tx)",
+                            textDecoration: checked ? "line-through" : "none",
+                            opacity: checked ? 0.7 : 1,
+                          }}
+                        >
+                          {item.supplement.name}
+                        </div>
+                        {item.supplement.dose && (
+                          <div style={{ fontSize: "12px", color: "var(--tx3)" }}>
+                            {item.supplement.dose}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                {items.length === 0 && (
+                  <div
+                    style={{
+                      padding: "14px 16px",
+                      textAlign: "center",
+                      fontStyle: "italic",
+                      fontSize: "13px",
+                      color: "var(--tx3)",
+                    }}
+                  >
+                    Tap + to add supplements
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 6. Picker Modal ── */}
+      {pickerOpen && (
+        <div
+          onClick={() => setPickerOpen(false)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.4)",
+            zIndex: 100,
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "center",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--bg)",
+              borderRadius: "20px 20px 0 0",
+              width: "100%",
+              maxWidth: "500px",
+              maxHeight: "70vh",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              animation: "slideUp 200ms ease-out",
+            }}
+          >
+            {/* Picker header */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "16px 20px",
+                borderBottom: "1px solid var(--brd)",
+              }}
+            >
+              <div style={{ fontSize: "17px", fontWeight: 700, color: "var(--tx)" }}>
+                {pickerType === "exercise"
+                  ? `Add ${categoryLabels[pickerCategory]} Exercise`
+                  : `Add ${suppGroupLabels[pickerTimeGroup]} Supplement`}
+              </div>
+              <button
+                onClick={() => setPickerOpen(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "20px",
+                  color: "var(--tx3)",
+                  cursor: "pointer",
+                  padding: "4px",
+                }}
+              >
+                &#10005;
+              </button>
+            </div>
+
+            {/* Picker items */}
+            <div style={{ overflowY: "auto", flex: 1 }}>
+              {pickerLoading ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "var(--tx3)", fontSize: "13px" }}>
+                  Loading...
+                </div>
+              ) : pickerItems.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "var(--tx3)", fontSize: "13px" }}>
+                  No items available
+                </div>
+              ) : (
+                pickerItems.map((item) => {
+                  if (pickerType === "exercise") {
+                    const ex = item as PickerExercise;
+                    const alreadyAdded = existingExerciseIds.has(ex.id);
+                    return (
+                      <button
+                        key={ex.id}
+                        disabled={alreadyAdded}
+                        onClick={() => !alreadyAdded && selectExercise(ex.id)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "14px 20px",
+                          border: "none",
+                          borderBottom: "1px solid var(--brd)",
+                          background: "transparent",
+                          cursor: alreadyAdded ? "default" : "pointer",
+                          opacity: alreadyAdded ? 0.4 : 1,
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                          <div>
+                            <div style={{ fontSize: "15px", color: "var(--tx)", fontWeight: 500 }}>{ex.name}</div>
+                            {ex.targets && (
+                              <div style={{ fontSize: "12px", color: "var(--tx3)", marginTop: "2px" }}>{ex.targets}</div>
+                            )}
+                            {ex.defaultRx && (
+                              <div style={{ fontSize: "12px", color: "var(--tx2)", marginTop: "2px" }}>{ex.defaultRx}</div>
+                            )}
+                          </div>
+                          {alreadyAdded && (
+                            <span
+                              style={{
+                                fontSize: "11px",
+                                fontWeight: 700,
+                                color: "var(--tx3)",
+                                background: "var(--s2)",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                              }}
+                            >
+                              Added
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    );
+                  } else {
+                    const supp = item as PickerSupplement;
+                    return (
+                      <button
+                        key={supp.id}
+                        onClick={() => selectSupplement(supp.id, pickerTimeGroup)}
+                        style={{
+                          display: "block",
+                          width: "100%",
+                          textAlign: "left",
+                          padding: "14px 20px",
+                          border: "none",
+                          borderBottom: "1px solid var(--brd)",
+                          background: "transparent",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ fontSize: "15px", color: "var(--tx)", fontWeight: 500 }}>{supp.name}</div>
+                        {supp.dose && (
+                          <div style={{ fontSize: "12px", color: "var(--tx3)", marginTop: "2px" }}>{supp.dose}</div>
+                        )}
+                      </button>
+                    );
+                  }
+                })
+              )}
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Slide-up animation */}
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }
