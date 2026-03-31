@@ -225,7 +225,7 @@ function AIPage() {
                 border: "1px solid #f0e8d8",
               }}
             >
-              <p className="text-[13px] leading-relaxed italic m-0" style={{ color: "var(--tx2)" }}>
+              <p className="text-[13px] leading-relaxed italic m-0" style={{ color: "var(--tx2)" }} suppressHydrationWarning>
                 &ldquo;{JOKES[jokeIndex]}&rdquo;
               </p>
               <p className="text-[11px] mt-1.5 mb-0" style={{ color: "var(--tx3)" }}>
