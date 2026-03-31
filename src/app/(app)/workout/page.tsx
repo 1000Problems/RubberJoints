@@ -114,8 +114,15 @@ export default function WorkoutPage() {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
+  const [transitioning, setTransitioning] = useState(false);
+  const hasLoadedOnce = useRef(false);
+
   const loadDay = useCallback(async () => {
-    setLoading(true);
+    if (hasLoadedOnce.current) {
+      setTransitioning(true);
+    } else {
+      setLoading(true);
+    }
     try {
       const res = await fetch(`/api/workout?date=${date}`);
       const data = await res.json();
@@ -125,10 +132,12 @@ export default function WorkoutPage() {
       setDayLabel(data.dayLabel || "");
       setWeekDays(data.weekDays || []);
       setIsFuture(data.isFuture || false);
+      hasLoadedOnce.current = true;
     } catch {
       // ignore
     } finally {
       setLoading(false);
+      setTransitioning(false);
     }
   }, [date]);
 
@@ -331,7 +340,7 @@ export default function WorkoutPage() {
     router.push("/login");
   }
 
-  if (loading) {
+  if (loading && !hasLoadedOnce.current) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "256px" }}>
         <div style={{ color: "var(--tx3)", fontSize: "13px" }}>Loading...</div>
@@ -352,7 +361,7 @@ export default function WorkoutPage() {
   progressRows.push({ key: "vitamins", label: "Vitamins", color: "#ffcc00", ...suppProgress });
 
   return (
-    <div>
+    <div style={{ opacity: transitioning ? 0.5 : 1, transition: "opacity 0.15s ease" }}>
       {/* ── 0. Username / Sign out bar ── */}
       {username && (
         <div
