@@ -456,6 +456,23 @@ export default function WorkoutPage() {
           <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--tx)" }}>
             {getDayDisplayLabel()}
           </div>
+          {date !== new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) && (
+            <button
+              onClick={() => setDate(new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }))}
+              style={{
+                fontSize: "13px",
+                fontWeight: 500,
+                color: "var(--acc)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: 0,
+                marginTop: "2px",
+              }}
+            >
+              Back to Today
+            </button>
+          )}
         </div>
         <button
           onClick={() => changeDay(1)}

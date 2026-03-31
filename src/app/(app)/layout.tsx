@@ -73,15 +73,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [pathname, router]);
 
   return (
-    <div className="flex flex-col h-[100dvh] w-full mx-auto relative" style={{ maxWidth: "100%" }}>
-      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))" }}>
-        <div style={{ maxWidth: "480px", margin: "0 auto" }}>
-          {children}
-        </div>
+    <div className="flex flex-col h-[100dvh]">
+      <main className="flex-1 overflow-y-auto" style={{ paddingBottom: "calc(64px + env(safe-area-inset-bottom, 0px))", maxWidth: "480px", margin: "0 auto", width: "100%" }}>
+        {children}
       </main>
       <nav
-        className="fixed bottom-0 left-1/2 -translate-x-1/2 flex justify-around items-center bg-[var(--s1)] border-t border-[var(--brd)] z-50"
-        style={{ height: "64px", paddingBottom: "env(safe-area-inset-bottom, 0px)", width: "100%", maxWidth: "480px" }}
+        className="fixed bottom-0 left-0 right-0 flex justify-around items-center bg-[var(--s1)] border-t border-[var(--brd)] z-50"
+        style={{ height: "64px", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         {navItems.map((item) => {
           const active = pathname === item.href;
