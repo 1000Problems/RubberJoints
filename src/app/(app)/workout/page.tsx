@@ -106,9 +106,12 @@ export default function WorkoutPage() {
   const [username, setUsername] = useState("");
 
   // Set initial date on client only to avoid SSR mismatch
+  // Check URL ?date= param first, then fall back to today (PST)
   useEffect(() => {
     if (!date) {
-      setDate(new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }));
+      const params = new URLSearchParams(window.location.search);
+      const urlDate = params.get("date");
+      setDate(urlDate || new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }));
     }
   }, [date]);
 
