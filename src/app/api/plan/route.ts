@@ -25,8 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No active enrollment" }, { status: 400 });
   }
 
-  const targetDate = date ? new Date(date) : todayPacific();
-  targetDate.setHours(0, 0, 0, 0);
+  const targetDate = date ? new Date(date + "T00:00:00Z") : todayPacific();
 
   // Get max sort order for this day
   const maxSort = await prisma.userDailyPlan.aggregate({
