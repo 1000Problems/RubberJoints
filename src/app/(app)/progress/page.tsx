@@ -255,11 +255,13 @@ export default function ProgressPage() {
               >
                 {/* Milestone row */}
                 <div
+                  onClick={() => toggleExpand(m.id)}
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: "12px",
                     padding: "12px 16px",
+                    cursor: "pointer",
                   }}
                 >
                   {/* Dot/checkbox */}
@@ -315,7 +317,7 @@ export default function ProgressPage() {
                   {/* Done button for incomplete */}
                   {!m.done && (
                     <button
-                      onClick={() => markDone(m.id)}
+                      onClick={(e) => { e.stopPropagation(); markDone(m.id); }}
                       disabled={isMarking}
                       style={{
                         padding: "6px 12px",
@@ -347,23 +349,6 @@ export default function ProgressPage() {
                     ›
                   </span>
 
-                  {/* Expand chevron */}
-                  <button
-                    onClick={() => toggleExpand(m.id)}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      padding: 0,
-                      cursor: "pointer",
-                      fontSize: "16px",
-                      color: "var(--tx3)",
-                      transform: isExpanded ? "rotate(90deg)" : "rotate(0deg)",
-                      transition: "transform 0.2s",
-                      flexShrink: 0,
-                    }}
-                  >
-                    ›
-                  </button>
                 </div>
 
                 {/* Expanded detail */}
