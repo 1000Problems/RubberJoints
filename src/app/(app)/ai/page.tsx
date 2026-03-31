@@ -1,22 +1,77 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
 }
 
+interface Stats {
+  exercisesDone: number;
+  exercisesTotal: number;
+  supplementsDone: number;
+  supplementsTotal: number;
+}
+
+const JOKES = [
+  "My joints just filed for workers' compensation.",
+  "These knees have more cracks than a comedy show.",
+  "I didn't choose the mobility life. My chiropractor did.",
+  "My spine just sent me a strongly worded letter.",
+  "Flexibility goal: touch my toes without narrating the journey.",
+  "My hip flexors are tighter than my schedule.",
+  "I stretch therefore I am... slightly less stiff.",
+  "My joints sound like a bowl of Rice Krispies.",
+  "Plot twist: the foam roller is the real workout.",
+  "My mobility routine has more steps than my skincare.",
+  "I'm not old, I'm just... acoustically gifted. *crack*",
+  "My knees predict weather better than meteorologists.",
+  "Squatting to the floor shouldn't feel like a trust fall.",
+  "My hips don't lie. They say 'we need help.'",
+  "I used to be flexible. Then I turned 25.",
+  "My joints have entered their protest era.",
+  "Deep squat? More like deep existential crisis.",
+  "I'm one sneeze away from throwing out my back.",
+  "My body makes sounds that aren't in any medical textbook.",
+  "Recovery day = the only day my joints don't roast me.",
+];
+
 export default function AIPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [jokeIndex, setJokeIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Week/phase info (static for now, could be fetched)
+  const currentWeek = 1;
+  const totalWeeks = 4;
+  const phaseName = "Foundation";
+  const weekProgress = currentWeek / totalWeeks;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    // Pick a random joke on mount
+    setJokeIndex(Math.floor(Math.random() * JOKES.length));
+  }, []);
+
+  useEffect(() => {
+    // Fetch stats
+    fetch("/api/ai/stats")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.error) setStats(data);
+      })
+      .catch(() => {});
+  }, []);
 
   function autoResize() {
     const ta = textareaRef.current;
@@ -67,51 +122,153 @@ export default function AIPage() {
   ];
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Messages */}
+    <div className="flex flex-col h-full" style={{ background: "var(--s1)" }}>
+      {/* ── Combined Top Bar ── */}
+      <div
+        className="flex items-center px-3 py-2.5 gap-3"
+        style={{
+          background: "var(--s1)",
+          borderBottom: "1px solid var(--s3)",
+        }}
+      >
+        {/* Hamburger menu */}
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="flex flex-col justify-center items-center w-9 h-9 shrink-0"
+          style={{ gap: "4px" }}
+          aria-label="Open sidebar"
+        >
+          <span style={{ display: "block", width: 20, height: 2, background: "var(--tx)", borderRadius: 1 }} />
+          <span style={{ display: "block", width: 20, height: 2, background: "var(--tx)", borderRadius: 1 }} />
+          <span style={{ display: "block", width: 20, height: 2, background: "var(--tx)", borderRadius: 1 }} />
+        </button>
+
+        {/* Center: Week + progress */}
+        <div className="flex-1 flex flex-col items-center gap-1">
+          <span className="text-[13px] font-semibold" style={{ color: "var(--tx)" }}>
+            Week {currentWeek} of {totalWeeks}
+          </span>
+          <div
+            className="w-full rounded-full overflow-hidden"
+            style={{ height: 3, background: "var(--s3)" }}
+          >
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${weekProgress * 100}%`,
+                background: "var(--grn)",
+                transition: "width 0.3s ease",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Right: Phase badge */}
+        <div
+          className="shrink-0 px-2.5 py-1 rounded-full text-[11px] font-semibold"
+          style={{
+            background: "rgba(74, 108, 247, 0.1)",
+            color: "var(--acc)",
+          }}
+        >
+          {phaseName}
+        </div>
+      </div>
+
+      {/* ── START TRAINING Button ── */}
+      <Link
+        href="/workout"
+        className="flex items-center justify-center gap-2 py-3 text-center no-underline"
+        style={{
+          background: "var(--acc)",
+          color: "white",
+          fontSize: 14,
+          fontWeight: 800,
+          letterSpacing: "1.5px",
+        }}
+      >
+        <span>🔥</span>
+        <span>START TRAINING</span>
+        <span>💪</span>
+      </Link>
+
+      {/* ── Messages Area ── */}
       <div className="flex-1 overflow-y-auto px-3 py-4" style={{ background: "var(--s1)" }}>
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center px-4">
-            {/* AI Avatar */}
+          <div className="flex flex-col gap-3">
+            {/* Joke Card */}
             <div
-              className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-              style={{ background: "linear-gradient(135deg, var(--acc), var(--pur))" }}
+              className="rounded-xl p-4"
+              style={{
+                background: "#fffbf0",
+                border: "1px solid #f0e8d8",
+              }}
             >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="white" stroke="none">
-                <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
-              </svg>
-            </div>
-            <h2 className="text-[17px] font-bold mb-1" style={{ color: "var(--tx)" }}>
-              Your Mobility Coach
-            </h2>
-            <p className="text-[13px] mb-6" style={{ color: "var(--tx3)" }}>
-              Ask me about your exercises, supplements, or plan
-            </p>
-
-            {/* Disclaimer */}
-            <div
-              className="rounded-lg p-3 mb-6 text-[11px] text-left w-full"
-              style={{ background: "#fff8e1", border: "1px solid #ffe082", color: "#8d6e00" }}
-            >
-              <span style={{ color: "#e65100" }}>⚠</span> AI suggestions are for informational purposes. Consult a healthcare provider for medical advice.
+              <p className="text-[13px] leading-relaxed italic m-0" style={{ color: "var(--tx2)" }}>
+                &ldquo;{JOKES[jokeIndex]}&rdquo;
+              </p>
+              <p className="text-[11px] mt-1.5 mb-0" style={{ color: "var(--tx3)" }}>
+                -- Your joints, probably
+              </p>
             </div>
 
-            {/* Chips */}
-            <div className="flex flex-wrap justify-center gap-2">
-              {chips.map((chip) => (
-                <button
-                  key={chip}
-                  onClick={() => sendMessage(chip)}
-                  className="px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all duration-150"
-                  style={{
-                    background: chip.startsWith("+") ? "rgba(74,108,247,0.06)" : "var(--s1)",
-                    border: `1px solid ${chip.startsWith("+") ? "var(--acc)" : "var(--brd)"}`,
-                    color: chip.startsWith("+") ? "var(--acc)" : "var(--tx)",
-                  }}
-                >
-                  {chip}
-                </button>
-              ))}
+            {/* Info Card */}
+            <div
+              className="rounded-xl p-4"
+              style={{
+                background: "var(--s2)",
+                border: "1px solid var(--s3)",
+              }}
+            >
+              {stats ? (
+                <p className="text-[13px] m-0 font-medium" style={{ color: "var(--tx)" }}>
+                  {stats.exercisesDone}/{stats.exercisesTotal} exercises &middot;{" "}
+                  {stats.supplementsDone}/{stats.supplementsTotal} supplements
+                </p>
+              ) : (
+                <p className="text-[13px] m-0 font-medium" style={{ color: "var(--tx3)" }}>
+                  Loading stats...
+                </p>
+              )}
+              <p className="text-[12px] mt-1.5 mb-0" style={{ color: "var(--tx3)" }}>
+                Check Progress tab to track your journey
+              </p>
+            </div>
+
+            {/* AI Avatar + intro */}
+            <div className="flex flex-col items-center text-center px-4 pt-2">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                style={{ background: "linear-gradient(135deg, var(--acc), var(--pur))" }}
+              >
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="white" stroke="none">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+                </svg>
+              </div>
+              <h2 className="text-[17px] font-bold mb-1" style={{ color: "var(--tx)" }}>
+                Your Mobility Coach
+              </h2>
+              <p className="text-[13px] mb-6" style={{ color: "var(--tx3)" }}>
+                Ask me about your exercises, supplements, or plan
+              </p>
+
+              {/* Chips */}
+              <div className="flex flex-wrap justify-center gap-2">
+                {chips.map((chip) => (
+                  <button
+                    key={chip}
+                    onClick={() => sendMessage(chip)}
+                    className="px-3.5 py-1.5 rounded-full text-[12px] font-medium transition-all duration-150"
+                    style={{
+                      background: chip.startsWith("+") ? "rgba(74,108,247,0.06)" : "var(--s1)",
+                      border: `1px solid ${chip.startsWith("+") ? "var(--acc)" : "var(--brd)"}`,
+                      color: chip.startsWith("+") ? "var(--acc)" : "var(--tx)",
+                    }}
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -179,7 +336,7 @@ export default function AIPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Chips bar */}
+      {/* Chips bar (when messages exist) */}
       {messages.length > 0 && (
         <div
           className="flex gap-1.5 px-3 py-2 overflow-x-auto"
@@ -206,8 +363,14 @@ export default function AIPage() {
         </div>
       )}
 
-      {/* Input */}
-      <div className="px-3 py-2" style={{ background: "var(--bg)", borderTop: messages.length === 0 ? "1px solid var(--s3)" : "none" }}>
+      {/* ── Input Area ── */}
+      <div
+        className="px-3 pt-2 pb-1"
+        style={{
+          background: "var(--bg)",
+          borderTop: messages.length === 0 ? "1px solid var(--s3)" : "none",
+        }}
+      >
         <div
           className="flex items-end gap-2 rounded-[20px] px-4 py-1.5"
           style={{ background: "var(--s1)", border: "1px solid var(--brd)" }}
@@ -215,7 +378,10 @@ export default function AIPage() {
           <textarea
             ref={textareaRef}
             value={input}
-            onChange={(e) => { setInput(e.target.value); autoResize(); }}
+            onChange={(e) => {
+              setInput(e.target.value);
+              autoResize();
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -241,6 +407,92 @@ export default function AIPage() {
               <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
             </svg>
           </button>
+        </div>
+
+        {/* Disclaimer */}
+        <div
+          className="flex items-center gap-1.5 rounded-lg px-3 py-2 mt-1.5 mb-1"
+          style={{
+            background: "#fff8e1",
+            border: "1px solid #ffe082",
+          }}
+        >
+          <span style={{ color: "#e65100", fontSize: 13, lineHeight: 1 }}>&#9888;</span>
+          <span className="text-[11px]" style={{ color: "#8d6e00" }}>
+            Not medical advice. Always consult a professional.
+          </span>
+        </div>
+      </div>
+
+      {/* ── Sidebar Overlay ── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40"
+          style={{ background: "rgba(0,0,0,0.4)" }}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* ── Sidebar ── */}
+      <div
+        className="fixed top-0 left-0 bottom-0 z-50 flex flex-col"
+        style={{
+          width: 280,
+          background: "var(--s1)",
+          borderRight: "1px solid var(--s3)",
+          transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.25s ease",
+        }}
+      >
+        {/* Sidebar header */}
+        <div
+          className="flex items-center justify-between px-4 py-3"
+          style={{ borderBottom: "1px solid var(--s3)" }}
+        >
+          <h3 className="text-[16px] font-bold m-0" style={{ color: "var(--tx)" }}>
+            Chats
+          </h3>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="w-8 h-8 flex items-center justify-center rounded-full"
+            style={{ background: "var(--s2)", color: "var(--tx2)" }}
+            aria-label="Close sidebar"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* New Chat button */}
+        <div className="px-3 py-3">
+          <button
+            onClick={() => {
+              setMessages([]);
+              setInput("");
+              setSidebarOpen(false);
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150"
+            style={{
+              background: "var(--acc)",
+              color: "white",
+              border: "none",
+            }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            New Chat
+          </button>
+        </div>
+
+        {/* Chat history list */}
+        <div className="flex-1 overflow-y-auto px-3">
+          <p className="text-[12px] text-center py-8" style={{ color: "var(--tx3)" }}>
+            No chat history yet
+          </p>
         </div>
       </div>
     </div>
