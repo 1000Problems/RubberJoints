@@ -730,8 +730,7 @@ export default function WorkoutPage() {
               {items.length === 0 ? (
                 <div
                   style={{
-                    padding: "20px 16px",
-                    textAlign: "center",
+                    padding: "12px 16px 8px 28px",
                     fontStyle: "italic",
                     fontSize: "13px",
                     color: "var(--tx3)",
@@ -988,9 +987,9 @@ export default function WorkoutPage() {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "space-between",
-                    padding: "6px 16px",
+                    padding: "8px 16px",
                     background: "var(--s2)",
-                    borderBottom: "1px solid var(--brd)",
+                    borderTop: "1px solid var(--brd)",
                   }}
                 >
                   <span
@@ -1075,23 +1074,23 @@ export default function WorkoutPage() {
                           {checked && "\u2713"}
                         </button>
                       )}
-                      <div style={{ flex: 1 }}>
-                        <div
-                          style={{
-                            fontSize: "14px",
-                            color: isFuture ? "var(--tx3)" : (checked ? "var(--tx3)" : "var(--tx)"),
-                            textDecoration: checked && !isFuture ? "line-through" : "none",
-                            opacity: checked && !isFuture ? 0.7 : 1,
-                          }}
-                        >
-                          {item.supplement.name}
-                        </div>
-                        {item.supplement.dose && (
-                          <div style={{ fontSize: "12px", color: "var(--tx3)" }}>
-                            {item.supplement.dose}
-                          </div>
-                        )}
+                      <div
+                        style={{
+                          flex: 1,
+                          fontSize: "14px",
+                          fontWeight: 500,
+                          color: isFuture ? "var(--tx3)" : (checked ? "var(--tx3)" : "var(--tx)"),
+                          textDecoration: checked && !isFuture ? "line-through" : "none",
+                          opacity: checked && !isFuture ? 0.7 : 1,
+                        }}
+                      >
+                        {item.supplement.name}
                       </div>
+                      {item.supplement.dose && (
+                        <div style={{ fontSize: "12px", color: "var(--tx3)", whiteSpace: "nowrap" }}>
+                          {item.supplement.dose}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
