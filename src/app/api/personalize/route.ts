@@ -52,12 +52,6 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Delete future plan entries and regenerate
-  const today = todayPacific();
-  await prisma.userDailyPlan.deleteMany({
-    where: { userId, date: { gte: today } },
-  });
-
   // Get active enrollment
   const enrollment = await prisma.userEnrollment.findFirst({
     where: { userId, status: "active" },
@@ -65,16 +59,30 @@ export async function POST(req: NextRequest) {
   });
 
   if (enrollment) {
-    // Regenerate plan
-    await generatePlanForUser(userId, enrollment.programId, today);
+    const today = todayPacific();
 
-    // Now remove exercises that are NOT in selectedExercises from today onward
+    // Reset enrollment start date to today for a fresh 28-day program
+    const newStartDate = today;
+    await prisma.userEnrollment.update({
+      where: { id: enrollment.id },
+      data: { startDate: newStartDate, status: "active" },
+    });
+
+    // Delete ALL existing plan entries (past and future) for a clean slate
+    await prisma.userDailyPlan.deleteMany({
+      where: { userId },
+    });
+
+    // Generate full 28-day plan from the enrollment start date
+    await generatePlanForUser(userId, enrollment.programId, newStartDate);
+
+    // Remove exercises NOT in selectedExercises (if user customized)
     if (selectedExercises.length > 0) {
       await prisma.userDailyPlan.deleteMany({
         where: {
           userId,
-          date: { gte: today },
           exerciseId: { notIn: selectedExercises },
+          isManual: false,
         },
       });
     }

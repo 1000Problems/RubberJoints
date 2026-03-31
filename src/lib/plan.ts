@@ -13,19 +13,19 @@ export async function generatePlanForUser(userId: number, programId: number, sta
   const program = await prisma.program.findUnique({ where: { id: programId } });
   if (!program) return;
 
-  // Build plan entries for each day
+  // Build plan entries for each day (full program duration)
   const entries = [];
   for (let day = 1; day <= program.durationDays; day++) {
     const date = new Date(startDate);
-    date.setDate(date.getDate() + day - 1);
-    date.setHours(0, 0, 0, 0);
+    date.setUTCDate(date.getUTCDate() + day - 1);
+    date.setUTCHours(0, 0, 0, 0);
 
     const dayTemplates = template.filter((t) => t.dayNumber === day);
     for (const t of dayTemplates) {
       entries.push({
         userId,
         programId,
-        date,
+        date: new Date(date), // clone to avoid mutation
         dayType: t.dayType,
         exerciseId: t.exerciseId,
         category: t.category,
