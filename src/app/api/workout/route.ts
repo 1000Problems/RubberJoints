@@ -74,6 +74,8 @@ export async function GET(req: NextRequest) {
     });
   }
 
+  const isFuture = (dateParam || todayStr) > todayStr;
+
   return NextResponse.json({
     plan,
     supplements,
@@ -81,5 +83,6 @@ export async function GET(req: NextRequest) {
     dayType,
     dayLabel,
     weekDays,
+    isFuture,
   });
 }

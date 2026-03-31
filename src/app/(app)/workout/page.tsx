@@ -95,6 +95,7 @@ export default function WorkoutPage() {
   const [loading, setLoading] = useState(true);
   const [dayLabel, setDayLabel] = useState("");
   const [weekDays, setWeekDays] = useState<WeekDay[]>([]);
+  const [isFuture, setIsFuture] = useState(false);
 
   // Picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -118,6 +119,7 @@ export default function WorkoutPage() {
       setChecks(data.checks || {});
       setDayLabel(data.dayLabel || "");
       setWeekDays(data.weekDays || []);
+      setIsFuture(data.isFuture || false);
     } catch {
       // ignore
     } finally {
@@ -128,6 +130,38 @@ export default function WorkoutPage() {
   useEffect(() => {
     loadDay();
   }, [loadDay]);
+
+  // Session auto-logging: log progress when leaving the page
+  const logSession = useCallback(() => {
+    const stepsTotal = plan.length;
+    if (stepsTotal === 0) return;
+    const stepsDone = plan.filter((p) => checks[`step:${p.exerciseId}:0`]).length;
+    const payload = JSON.stringify({ stepsDone, stepsTotal });
+    if (typeof navigator !== "undefined" && navigator.sendBeacon) {
+      navigator.sendBeacon("/api/session", new Blob([payload], { type: "application/json" }));
+    } else {
+      fetch("/api/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: payload,
+        keepalive: true,
+      }).catch(() => {});
+    }
+  }, [plan, checks]);
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") {
+        logSession();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      // Also log on unmount
+      logSession();
+    };
+  }, [logSession]);
 
   // Swipe gestures
   useEffect(() => {
@@ -352,6 +386,24 @@ export default function WorkoutPage() {
           &#8250;
         </button>
       </div>
+
+      {/* ── Future Day Notice ── */}
+      {isFuture && (
+        <div
+          style={{
+            margin: "0 16px 12px",
+            padding: "8px 14px",
+            borderRadius: "10px",
+            background: "var(--s2)",
+            border: "1px dashed var(--brd)",
+            fontSize: "12px",
+            color: "var(--tx3)",
+            textAlign: "center",
+          }}
+        >
+          Preview — exercises can&apos;t be checked off for future days
+        </div>
+      )}
 
       {/* ── 2. Activity Summary Card ── */}
       <div
@@ -625,7 +677,7 @@ export default function WorkoutPage() {
                   const checked = checks[key] || false;
                   const isExpanded = expanded.has(item.exerciseId);
                   return (
-                    <div key={item.id} style={{ borderBottom: "1px solid var(--brd)" }}>
+                    <div key={item.id} style={{ borderBottom: "1px solid var(--brd)", opacity: isFuture ? 0.65 : 1 }}>
                       <div
                         style={{
                           display: "flex",
@@ -635,27 +687,40 @@ export default function WorkoutPage() {
                           background: "var(--s1)",
                         }}
                       >
-                        {/* Checkbox */}
-                        <button
-                          onClick={() => toggleCheck("step", item.exerciseId, 0)}
-                          style={{
-                            width: "26px",
-                            height: "26px",
-                            borderRadius: "8px",
-                            border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
-                            background: checked ? "var(--grn)" : "transparent",
-                            color: "#ffffff",
-                            fontSize: "14px",
-                            fontWeight: 700,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            flexShrink: 0,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {checked && "\u2713"}
-                        </button>
+                        {/* Checkbox / Future preview placeholder */}
+                        {isFuture ? (
+                          <div
+                            style={{
+                              width: "26px",
+                              height: "26px",
+                              borderRadius: "8px",
+                              border: "2px dashed var(--brd)",
+                              opacity: 0.5,
+                              flexShrink: 0,
+                            }}
+                          />
+                        ) : (
+                          <button
+                            onClick={() => toggleCheck("step", item.exerciseId, 0)}
+                            style={{
+                              width: "26px",
+                              height: "26px",
+                              borderRadius: "8px",
+                              border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
+                              background: checked ? "var(--grn)" : "transparent",
+                              color: "#ffffff",
+                              fontSize: "14px",
+                              fontWeight: 700,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              flexShrink: 0,
+                              cursor: "pointer",
+                            }}
+                          >
+                            {checked && "\u2713"}
+                          </button>
+                        )}
 
                         {/* Name + target area */}
                         <button
@@ -676,9 +741,9 @@ export default function WorkoutPage() {
                           <div
                             style={{
                               fontSize: "15px",
-                              color: checked ? "var(--tx3)" : "var(--tx)",
-                              textDecoration: checked ? "line-through" : "none",
-                              opacity: checked ? 0.7 : 1,
+                              color: isFuture ? "var(--tx3)" : (checked ? "var(--tx3)" : "var(--tx)"),
+                              textDecoration: checked && !isFuture ? "line-through" : "none",
+                              opacity: checked && !isFuture ? 0.7 : 1,
                             }}
                           >
                             {item.exercise.name}
@@ -692,7 +757,7 @@ export default function WorkoutPage() {
 
                         {/* Reps */}
                         {item.rx && (
-                          <div style={{ fontSize: "13px", color: "var(--tx2)", flexShrink: 0 }}>
+                          <div style={{ fontSize: "13px", color: isFuture ? "var(--tx3)" : "var(--tx2)", flexShrink: 0 }}>
                             {item.rx}
                           </div>
                         )}
@@ -898,35 +963,49 @@ export default function WorkoutPage() {
                         gap: "12px",
                         padding: "12px 16px",
                         borderBottom: "1px solid var(--brd)",
+                        opacity: isFuture ? 0.65 : 1,
                       }}
                     >
-                      <button
-                        onClick={() => toggleCheck("supplement", item.supplementId, 0)}
-                        style={{
-                          width: "24px",
-                          height: "24px",
-                          borderRadius: "6px",
-                          border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
-                          background: checked ? "var(--grn)" : "transparent",
-                          color: "#ffffff",
-                          fontSize: "12px",
-                          fontWeight: 700,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          flexShrink: 0,
-                          cursor: "pointer",
-                        }}
-                      >
-                        {checked && "\u2713"}
-                      </button>
+                      {isFuture ? (
+                        <div
+                          style={{
+                            width: "24px",
+                            height: "24px",
+                            borderRadius: "6px",
+                            border: "2px dashed var(--brd)",
+                            opacity: 0.5,
+                            flexShrink: 0,
+                          }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => toggleCheck("supplement", item.supplementId, 0)}
+                          style={{
+                            width: "24px",
+                            height: "24px",
+                            borderRadius: "6px",
+                            border: checked ? "2px solid var(--grn)" : "2px solid var(--brd)",
+                            background: checked ? "var(--grn)" : "transparent",
+                            color: "#ffffff",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            flexShrink: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {checked && "\u2713"}
+                        </button>
+                      )}
                       <div style={{ flex: 1 }}>
                         <div
                           style={{
                             fontSize: "14px",
-                            color: checked ? "var(--tx3)" : "var(--tx)",
-                            textDecoration: checked ? "line-through" : "none",
-                            opacity: checked ? 0.7 : 1,
+                            color: isFuture ? "var(--tx3)" : (checked ? "var(--tx3)" : "var(--tx)"),
+                            textDecoration: checked && !isFuture ? "line-through" : "none",
+                            opacity: checked && !isFuture ? 0.7 : 1,
                           }}
                         >
                           {item.supplement.name}
