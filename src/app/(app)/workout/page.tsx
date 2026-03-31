@@ -36,14 +36,29 @@ interface CheckState {
   [key: string]: boolean;
 }
 
+const categoryColors: Record<string, string> = {
+  warmup_tool: "var(--org)",
+  mobility: "var(--grn)",
+  recovery_tool: "var(--acc)",
+};
+
+const categoryLabels: Record<string, string> = {
+  warmup_tool: "WARM-UP",
+  mobility: "MOBILITY",
+  recovery_tool: "RECOVERY",
+};
+
+const suppGroupLabels: Record<string, string> = {
+  am: "MORNING",
+  mid: "MIDDAY",
+  pm: "EVENING",
+};
+
 export default function WorkoutPage() {
   const [plan, setPlan] = useState<PlanItem[]>([]);
   const [supplements, setSupplements] = useState<SupplementItem[]>([]);
   const [checks, setChecks] = useState<CheckState>({});
-  const [date, setDate] = useState(() => {
-    const d = new Date();
-    return d.toISOString().split("T")[0];
-  });
+  const [date, setDate] = useState(() => new Date().toISOString().split("T")[0]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
@@ -62,15 +77,12 @@ export default function WorkoutPage() {
     }
   }, [date]);
 
-  useEffect(() => {
-    loadDay();
-  }, [loadDay]);
+  useEffect(() => { loadDay(); }, [loadDay]);
 
   async function toggleCheck(itemType: string, itemId: string, stepIndex: number) {
     const key = `${itemType}:${itemId}:${stepIndex}`;
     const newChecked = !checks[key];
     setChecks((prev) => ({ ...prev, [key]: newChecked }));
-
     try {
       await fetch("/api/check", {
         method: "POST",
@@ -83,49 +95,51 @@ export default function WorkoutPage() {
   }
 
   function changeDay(delta: number) {
-    const d = new Date(date);
+    const d = new Date(date + "T12:00:00");
     d.setDate(d.getDate() + delta);
     setDate(d.toISOString().split("T")[0]);
   }
 
-  const categories = ["warmup_tool", "mobility", "recovery_tool"];
-  const categoryLabels: Record<string, string> = {
-    warmup_tool: "Warm-Up",
-    mobility: "Mobility",
-    recovery_tool: "Recovery",
-  };
-
-  const suppGroups = ["am", "mid", "pm"];
-  const suppGroupLabels: Record<string, string> = {
-    am: "Morning",
-    mid: "Midday",
-    pm: "Evening",
-  };
-
   function getCategoryProgress(cat: string) {
     const items = plan.filter((p) => p.category === cat);
-    if (items.length === 0) return 0;
+    if (items.length === 0) return { done: 0, total: 0, pct: 0 };
     const done = items.filter((p) => checks[`step:${p.exerciseId}:0`]).length;
-    return Math.round((done / items.length) * 100);
+    return { done, total: items.length, pct: Math.round((done / items.length) * 100) };
+  }
+
+  function getSuppProgress() {
+    if (supplements.length === 0) return { done: 0, total: 0, pct: 0 };
+    const done = supplements.filter((s) => checks[`supplement:${s.supplementId}:0`]).length;
+    return { done, total: supplements.length, pct: Math.round((done / supplements.length) * 100) };
   }
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-400 text-sm">Loading...</div>
+        <div style={{ color: "var(--tx3)", fontSize: "13px" }}>Loading...</div>
       </div>
     );
   }
 
+  const categories = ["warmup_tool", "mobility", "recovery_tool"];
+  const suppProgress = getSuppProgress();
+
   return (
-    <div className="max-w-lg mx-auto">
-      {/* Day header */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <button onClick={() => changeDay(-1)} className="p-2 text-gray-500 hover:text-gray-800">
-          &larr;
+    <div>
+      {/* Day navigation */}
+      <div
+        className="flex items-center justify-between px-4 py-3 sticky top-0 z-10"
+        style={{ background: "var(--bg)" }}
+      >
+        <button
+          onClick={() => changeDay(-1)}
+          className="w-10 h-10 flex items-center justify-center rounded-xl text-[22px] font-bold"
+          style={{ background: "var(--s1)", border: "1px solid var(--brd)", color: "var(--tx)" }}
+        >
+          ‹
         </button>
         <div className="text-center">
-          <div className="font-semibold text-sm">
+          <div className="text-[16px] font-bold" style={{ color: "var(--tx)" }}>
             {new Date(date + "T12:00:00").toLocaleDateString("en-US", {
               weekday: "long",
               month: "short",
@@ -133,142 +147,285 @@ export default function WorkoutPage() {
             })}
           </div>
         </div>
-        <button onClick={() => changeDay(1)} className="p-2 text-gray-500 hover:text-gray-800">
-          &rarr;
+        <button
+          onClick={() => changeDay(1)}
+          className="w-10 h-10 flex items-center justify-center rounded-xl text-[22px] font-bold"
+          style={{ background: "var(--s1)", border: "1px solid var(--brd)", color: "var(--tx)" }}
+        >
+          ›
         </button>
       </div>
 
-      {/* Progress bars */}
-      <div className="px-4 py-3 flex gap-2">
-        {categories.map((cat) => {
-          const pct = getCategoryProgress(cat);
-          return (
-            <div key={cat} className="flex-1">
-              <div className="text-[10px] text-gray-500 mb-1">{categoryLabels[cat]}</div>
-              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+      {/* Activity Summary Card */}
+      <div
+        className="mx-4 mb-3 p-4 rounded-2xl"
+        style={{ background: "var(--s1)", border: "1px solid var(--brd)" }}
+      >
+        <div
+          className="text-[11px] font-extrabold uppercase mb-3"
+          style={{ letterSpacing: "0.1em", color: "var(--tx3)" }}
+        >
+          TODAY&apos;S ACTIVITY
+        </div>
+        <div className="flex flex-col gap-2.5">
+          {categories.map((cat) => {
+            const { done, total, pct } = getCategoryProgress(cat);
+            if (total === 0) return null;
+            return (
+              <div key={cat} className="flex items-center gap-3">
+                <div className="w-20 text-[12px] font-bold" style={{ color: categoryColors[cat] }}>
+                  {categoryLabels[cat]}
+                </div>
+                <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "var(--s3)" }}>
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      width: `${pct}%`,
+                      background: categoryColors[cat],
+                      transition: "width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                    }}
+                  />
+                </div>
+                <div className="w-9 text-right text-[12px] font-bold" style={{ color: "var(--tx2)" }}>
+                  {done}/{total}
+                </div>
+              </div>
+            );
+          })}
+          {suppProgress.total > 0 && (
+            <div className="flex items-center gap-3">
+              <div className="w-20 text-[12px] font-bold" style={{ color: "var(--yel)" }}>
+                VITAMINS
+              </div>
+              <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "var(--s3)" }}>
                 <div
-                  className="h-full bg-green-500 rounded-full transition-all"
-                  style={{ width: `${pct}%` }}
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${suppProgress.pct}%`,
+                    background: "var(--yel)",
+                    transition: "width 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)",
+                  }}
                 />
               </div>
+              <div className="w-9 text-right text-[12px] font-bold" style={{ color: "var(--tx2)" }}>
+                {suppProgress.done}/{suppProgress.total}
+              </div>
             </div>
-          );
-        })}
+          )}
+        </div>
       </div>
 
-      {/* Exercises by category */}
+      {/* Exercise sections by category */}
       {categories.map((cat) => {
         const items = plan.filter((p) => p.category === cat);
         if (items.length === 0) return null;
         return (
-          <div key={cat} className="mb-4">
-            <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50">
-              {categoryLabels[cat]}
+          <div key={cat} className="mb-3">
+            {/* Section header */}
+            <div
+              className="flex items-center gap-2 px-4 py-2.5"
+              style={{ background: "var(--s2)", borderBottom: "1px solid var(--brd)" }}
+            >
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ background: categoryColors[cat] }}
+              />
+              <span
+                className="text-[11px] font-bold uppercase flex-1"
+                style={{ letterSpacing: "1px", color: "var(--tx3)" }}
+              >
+                {categoryLabels[cat]}
+              </span>
+              <span className="text-[12px] font-bold" style={{ color: "var(--tx3)" }}>
+                {getCategoryProgress(cat).done}/{getCategoryProgress(cat).total}
+              </span>
             </div>
-            {items.map((item) => {
-              const key = `step:${item.exerciseId}:0`;
-              const checked = checks[key] || false;
-              const isExpanded = expanded.has(item.exerciseId);
-              return (
-                <div key={item.id} className="border-b border-gray-100">
-                  <div className="flex items-center px-4 py-3 gap-3">
-                    <button
-                      onClick={() => toggleCheck("step", item.exerciseId, 0)}
-                      className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
-                        checked
-                          ? "bg-green-500 border-green-500 text-white"
-                          : "border-gray-300"
-                      }`}
-                    >
-                      {checked && (
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                        </svg>
-                      )}
-                    </button>
-                    <button
-                      onClick={() => {
-                        const next = new Set(expanded);
-                        isExpanded ? next.delete(item.exerciseId) : next.add(item.exerciseId);
-                        setExpanded(next);
-                      }}
-                      className="flex-1 text-left"
-                    >
-                      <div className={`text-sm font-medium ${checked ? "text-gray-400 line-through" : "text-gray-800"}`}>
-                        {item.exercise.name}
-                      </div>
-                      {item.rx && (
-                        <div className="text-xs text-gray-500">{item.rx}</div>
-                      )}
-                    </button>
-                  </div>
-                  {isExpanded && (
-                    <div className="px-12 pb-3 text-xs text-gray-600 space-y-1">
-                      {item.exercise.targets && <p><span className="font-medium">Targets:</span> {item.exercise.targets}</p>}
-                      {item.exercise.description && <p>{item.exercise.description}</p>}
-                      {item.exercise.cues && <p><span className="font-medium">Cues:</span> {item.exercise.cues}</p>}
-                      {item.exercise.warning && <p className="text-amber-600"><span className="font-medium">Warning:</span> {item.exercise.warning}</p>}
+
+            {/* Exercise items */}
+            <div style={{ background: "var(--s1)" }}>
+              {items.map((item) => {
+                const key = `step:${item.exerciseId}:0`;
+                const checked = checks[key] || false;
+                const isExpanded = expanded.has(item.exerciseId);
+                return (
+                  <div key={item.id} style={{ borderBottom: "1px solid var(--brd)" }}>
+                    <div className="flex items-center gap-3 px-4 py-3.5">
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => toggleCheck("step", item.exerciseId, 0)}
+                        className="w-[26px] h-[26px] rounded-lg flex items-center justify-center shrink-0"
+                        style={{
+                          border: checked ? "none" : "2px solid var(--brd)",
+                          background: checked ? "var(--grn)" : "transparent",
+                          color: "white",
+                          fontSize: "14px",
+                          fontWeight: 700,
+                        }}
+                      >
+                        {checked && "✓"}
+                      </button>
+
+                      {/* Name + rx */}
+                      <button
+                        onClick={() => {
+                          const next = new Set(expanded);
+                          isExpanded ? next.delete(item.exerciseId) : next.add(item.exerciseId);
+                          setExpanded(next);
+                        }}
+                        className="flex-1 text-left"
+                      >
+                        <div
+                          className="text-[15px]"
+                          style={{
+                            color: checked ? "var(--tx3)" : "var(--tx)",
+                            textDecoration: checked ? "line-through" : "none",
+                            opacity: checked ? 0.7 : 1,
+                          }}
+                        >
+                          {item.exercise.name}
+                        </div>
+                        {item.rx && (
+                          <div className="text-[13px]" style={{ color: "var(--tx2)" }}>
+                            {item.rx}
+                          </div>
+                        )}
+                      </button>
                     </div>
-                  )}
-                </div>
-              );
-            })}
+
+                    {/* Expanded detail */}
+                    {isExpanded && (
+                      <div
+                        className="px-4 pb-3 text-[13px]"
+                        style={{
+                          paddingLeft: "54px",
+                          background: "var(--s2)",
+                          color: "var(--tx2)",
+                        }}
+                      >
+                        {item.exercise.targets && (
+                          <p className="mb-1">
+                            <span className="font-semibold" style={{ color: "var(--acc)" }}>Targets:</span>{" "}
+                            {item.exercise.targets}
+                          </p>
+                        )}
+                        {item.exercise.description && <p className="mb-1">{item.exercise.description}</p>}
+                        {item.exercise.cues && (
+                          <p className="mb-1">
+                            <span className="font-semibold" style={{ color: "var(--acc)" }}>Cues:</span>{" "}
+                            {item.exercise.cues}
+                          </p>
+                        )}
+                        {item.exercise.warning && (
+                          <p className="mb-1" style={{ color: "var(--org)" }}>
+                            <span className="font-semibold">⚠ Warning:</span> {item.exercise.warning}
+                          </p>
+                        )}
+                        {/* YouTube demo link */}
+                        <a
+                          href={`https://www.youtube.com/results?search_query=${encodeURIComponent(item.exercise.name + " exercise demo")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-[12px] font-semibold text-white"
+                          style={{ background: "#ff0000" }}
+                        >
+                          ▶ YouTube Demo
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         );
       })}
 
       {/* Supplements */}
       {supplements.length > 0 && (
-        <div className="mb-4">
-          <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider bg-gray-50">
-            Supplements
+        <div className="mb-3">
+          <div
+            className="flex items-center gap-2 px-4 py-2.5"
+            style={{ background: "var(--s2)", borderBottom: "1px solid var(--brd)" }}
+          >
+            <div className="w-2 h-2 rounded-full" style={{ background: "var(--yel)" }} />
+            <span
+              className="text-[11px] font-bold uppercase flex-1"
+              style={{ letterSpacing: "1px", color: "var(--tx3)" }}
+            >
+              SUPPLEMENTS
+            </span>
+            <span className="text-[12px] font-bold" style={{ color: "var(--tx3)" }}>
+              {suppProgress.done}/{suppProgress.total}
+            </span>
           </div>
-          {suppGroups.map((group) => {
-            const items = supplements.filter((s) => s.timeGroup === group);
-            if (items.length === 0) return null;
-            return (
-              <div key={group}>
-                <div className="px-4 py-1.5 text-[10px] font-semibold text-blue-600 uppercase">
-                  {suppGroupLabels[group]}
-                </div>
-                {items.map((item) => {
-                  const key = `supplement:${item.supplementId}:0`;
-                  const checked = checks[key] || false;
-                  return (
-                    <div key={item.id} className="flex items-center px-4 py-2.5 gap-3 border-b border-gray-50">
-                      <button
-                        onClick={() => toggleCheck("supplement", item.supplementId, 0)}
-                        className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${
-                          checked
-                            ? "bg-green-500 border-green-500 text-white"
-                            : "border-gray-300"
-                        }`}
+
+          <div style={{ background: "var(--s1)" }}>
+            {["am", "mid", "pm"].map((group) => {
+              const items = supplements.filter((s) => s.timeGroup === group);
+              if (items.length === 0) return null;
+              return (
+                <div key={group}>
+                  <div
+                    className="px-4 py-1.5 text-[11px] font-bold uppercase"
+                    style={{
+                      background: "var(--s2)",
+                      letterSpacing: "0.05em",
+                      color: "var(--tx3)",
+                    }}
+                  >
+                    {suppGroupLabels[group]}
+                  </div>
+                  {items.map((item) => {
+                    const key = `supplement:${item.supplementId}:0`;
+                    const checked = checks[key] || false;
+                    return (
+                      <div
+                        key={item.id}
+                        className="flex items-center gap-3 px-4 py-3"
+                        style={{ borderBottom: "1px solid var(--brd)" }}
                       >
-                        {checked && (
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </button>
-                      <div className="flex-1">
-                        <div className={`text-sm ${checked ? "text-gray-400 line-through" : "text-gray-800"}`}>
-                          {item.supplement.name}
+                        <button
+                          onClick={() => toggleCheck("supplement", item.supplementId, 0)}
+                          className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+                          style={{
+                            border: checked ? "none" : "2px solid var(--brd)",
+                            background: checked ? "var(--grn)" : "transparent",
+                            color: "white",
+                            fontSize: "12px",
+                            fontWeight: 700,
+                          }}
+                        >
+                          {checked && "✓"}
+                        </button>
+                        <div className="flex-1">
+                          <div
+                            className="text-[14px]"
+                            style={{
+                              color: checked ? "var(--tx3)" : "var(--tx)",
+                              textDecoration: checked ? "line-through" : "none",
+                              opacity: checked ? 0.7 : 1,
+                            }}
+                          >
+                            {item.supplement.name}
+                          </div>
+                          {item.supplement.dose && (
+                            <div className="text-[12px]" style={{ color: "var(--tx3)" }}>
+                              {item.supplement.dose}
+                            </div>
+                          )}
                         </div>
-                        {item.supplement.dose && (
-                          <div className="text-xs text-gray-500">{item.supplement.dose}</div>
-                        )}
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {plan.length === 0 && supplements.length === 0 && (
-        <div className="text-center py-16 text-gray-400 text-sm">
+        <div className="text-center py-16 text-[13px]" style={{ color: "var(--tx3)" }}>
           No exercises planned for this day
         </div>
       )}
