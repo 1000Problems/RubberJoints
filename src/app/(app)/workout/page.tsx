@@ -822,12 +822,18 @@ export default function WorkoutPage() {
                   return (
                     <div key={item.id} style={{ borderBottom: "1px solid var(--brd)", opacity: isFuture ? 0.65 : 1 }}>
                       <div
+                        onClick={() => {
+                          const next = new Set(expanded);
+                          isExpanded ? next.delete(item.exerciseId) : next.add(item.exerciseId);
+                          setExpanded(next);
+                        }}
                         style={{
                           display: "flex",
                           alignItems: "center",
                           gap: "12px",
                           padding: "12px 16px",
                           background: "var(--s1)",
+                          cursor: "pointer",
                         }}
                       >
                         {/* Checkbox / Future preview placeholder */}
@@ -844,7 +850,7 @@ export default function WorkoutPage() {
                           />
                         ) : (
                           <button
-                            onClick={() => toggleCheck("step", item.exerciseId, 0)}
+                            onClick={(e) => { e.stopPropagation(); toggleCheck("step", item.exerciseId, 0); }}
                             style={{
                               width: "26px",
                               height: "26px",
@@ -866,21 +872,7 @@ export default function WorkoutPage() {
                         )}
 
                         {/* Name + target area */}
-                        <button
-                          onClick={() => {
-                            const next = new Set(expanded);
-                            isExpanded ? next.delete(item.exerciseId) : next.add(item.exerciseId);
-                            setExpanded(next);
-                          }}
-                          style={{
-                            flex: 1,
-                            textAlign: "left",
-                            background: "none",
-                            border: "none",
-                            padding: 0,
-                            cursor: "pointer",
-                          }}
-                        >
+                        <div style={{ flex: 1 }}>
                           <div
                             style={{
                               fontSize: "15px",
@@ -896,7 +888,7 @@ export default function WorkoutPage() {
                               {item.exercise.targets}
                             </div>
                           )}
-                        </button>
+                        </div>
 
                         {/* Reps */}
                         {item.rx && (
