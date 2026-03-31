@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, Suspense } from "react";
+import { useState, useRef, useEffect, Suspense, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -14,6 +14,21 @@ interface Stats {
   exercisesTotal: number;
   supplementsDone: number;
   supplementsTotal: number;
+}
+
+interface ExerciseItem {
+  id: string;
+  name: string;
+  category: string;
+  targets?: string;
+}
+
+interface SupplementItem {
+  id: string;
+  name: string;
+  dose?: string;
+  time?: string;
+  timeGroup: string;
 }
 
 const JOKES = [
@@ -39,6 +54,117 @@ const JOKES = [
   "Recovery day = the only day my joints don't roast me.",
 ];
 
+/* ── Picker Grid Component ── */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function PickerGrid({
+  items,
+  selected,
+  onToggle,
+  labelKey,
+  subKey,
+  onConfirm,
+}: {
+  items: Record<string, any>[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  labelKey: string;
+  subKey: string;
+  onConfirm: () => void;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 10,
+        }}
+      >
+        {items.map((item) => {
+          const isSelected = selected.has(item.id);
+          return (
+            <button
+              key={item.id}
+              onClick={() => onToggle(item.id)}
+              style={{
+                position: "relative",
+                border: `2px solid ${isSelected ? "var(--acc)" : "var(--brd)"}`,
+                borderRadius: 10,
+                padding: "10px 12px",
+                background: isSelected ? "rgba(74,108,247,0.08)" : "var(--s1)",
+                textAlign: "left",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              {isSelected && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 6,
+                    right: 6,
+                    width: 18,
+                    height: 18,
+                    borderRadius: "50%",
+                    background: "var(--grn, #22c55e)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 11,
+                    color: "white",
+                    fontWeight: 700,
+                  }}
+                >
+                  ✓
+                </span>
+              )}
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "var(--tx)",
+                  lineHeight: 1.3,
+                  paddingRight: isSelected ? 20 : 0,
+                }}
+              >
+                {item[labelKey] as string}
+              </div>
+              {item[subKey] ? (
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "var(--tx3)",
+                    marginTop: 3,
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {String(item[subKey])}
+                </div>
+              ) : null}
+            </button>
+          );
+        })}
+      </div>
+      <button
+        onClick={onConfirm}
+        style={{
+          width: "100%",
+          padding: 12,
+          background: "var(--acc)",
+          color: "white",
+          border: "none",
+          borderRadius: 12,
+          fontSize: 15,
+          fontWeight: 600,
+          cursor: "pointer",
+        }}
+      >
+        Confirm ({selected.size} selected)
+      </button>
+    </div>
+  );
+}
+
 export default function AIPageWrapper() {
   return (
     <Suspense fallback={<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "256px" }}><div style={{ color: "var(--tx3)", fontSize: "13px" }}>Loading...</div></div>}>
@@ -59,6 +185,20 @@ function AIPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const autoPromptSent = useRef(false);
 
+  // ── Personalize state ──
+  const [personalizeStep, setPersonalizeStep] = useState<number | null>(null);
+  const [daysPerWeek, setDaysPerWeek] = useState(5);
+  const [warmupExercises, setWarmupExercises] = useState<ExerciseItem[]>([]);
+  const [mobilityExercises, setMobilityExercises] = useState<ExerciseItem[]>([]);
+  const [recoveryExercises, setRecoveryExercises] = useState<ExerciseItem[]>([]);
+  const [supplements, setSupplements] = useState<SupplementItem[]>([]);
+  const [selectedWarmup, setSelectedWarmup] = useState<Set<string>>(new Set());
+  const [selectedMobility, setSelectedMobility] = useState<Set<string>>(new Set());
+  const [selectedRecovery, setSelectedRecovery] = useState<Set<string>>(new Set());
+  const [selectedSupplements, setSelectedSupplements] = useState<Set<string>>(new Set());
+  const [personalizeLoading, setPersonalizeLoading] = useState(false);
+  const [onboardingFinalized, setOnboardingFinalized] = useState(false);
+
   // Week/phase info (static for now, could be fetched)
   const currentWeek = 1;
   const totalWeeks = 4;
@@ -67,7 +207,7 @@ function AIPage() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, personalizeStep]);
 
   useEffect(() => {
     // Pick a random joke on mount
@@ -123,7 +263,24 @@ function AIPage() {
       });
       const data = await res.json();
       if (data.reply) {
-        setMessages([...newMessages, { role: "assistant", content: data.reply }]);
+        const reply = data.reply;
+        setMessages([...newMessages, { role: "assistant", content: reply }]);
+
+        // Check if finalize_onboarding was called (the AI mentions profile saved or similar)
+        // We detect this by checking if the reply indicates the profile was captured
+        if (personalizeStep === 1 && !onboardingFinalized) {
+          // The AI chat endpoint handles finalize_onboarding internally.
+          // We check for keywords indicating the profile was saved.
+          const finalizePhrases = [
+            "profile", "saved", "noted", "recorded", "captured",
+            "got it", "ready to", "let's move", "next step",
+            "personali", "summar",
+          ];
+          const lower = reply.toLowerCase();
+          if (finalizePhrases.some((p) => lower.includes(p))) {
+            setOnboardingFinalized(true);
+          }
+        }
       }
     } catch {
       setMessages([
@@ -135,12 +292,673 @@ function AIPage() {
     }
   }
 
+  // Fetch exercises by category
+  const fetchExercises = useCallback(async (category: string): Promise<ExerciseItem[]> => {
+    try {
+      const res = await fetch(`/api/exercises?category=${category}`);
+      const data = await res.json();
+      return data.exercises || [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Fetch all supplements
+  const fetchSupplements = useCallback(async (): Promise<SupplementItem[]> => {
+    try {
+      const res = await fetch("/api/supplements?all=true");
+      const data = await res.json();
+      return data.supplements || [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // Start personalization step 1 (AI questionnaire)
+  async function startQuestionnaire() {
+    setPersonalizeStep(1);
+    await sendMessage(
+      "I want to personalize my plan. Ask me about my goals, problem areas, activity level, equipment access, how many days per week I want to train, and any injuries or cautions. Ask ONE question at a time."
+    );
+  }
+
+  // Handle picking quick start vs customize
+  async function handleQuickStart() {
+    setPersonalizeLoading(true);
+    try {
+      // Fetch all exercises
+      const [w, m, r] = await Promise.all([
+        fetchExercises("warmup_tool"),
+        fetchExercises("mobility"),
+        fetchExercises("recovery_tool"),
+      ]);
+      const allExerciseIds = [...w, ...m, ...r].map((e) => e.id);
+
+      await fetch("/api/personalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selectedExercises: allExerciseIds,
+          selectedSupplements: [],
+          daysPerWeek,
+        }),
+      });
+      setPersonalizeStep(7);
+    } catch {
+      // ignore
+    } finally {
+      setPersonalizeLoading(false);
+    }
+  }
+
+  async function handleCustomize() {
+    setPersonalizeLoading(true);
+    try {
+      const exercises = await fetchExercises("warmup_tool");
+      setWarmupExercises(exercises);
+      setSelectedWarmup(new Set(exercises.map((e) => e.id)));
+      setPersonalizeStep(3);
+    } catch {
+      // ignore
+    } finally {
+      setPersonalizeLoading(false);
+    }
+  }
+
+  async function confirmWarmup() {
+    setPersonalizeLoading(true);
+    try {
+      const exercises = await fetchExercises("mobility");
+      setMobilityExercises(exercises);
+      setSelectedMobility(new Set(exercises.map((e) => e.id)));
+      setPersonalizeStep(4);
+    } catch {
+      // ignore
+    } finally {
+      setPersonalizeLoading(false);
+    }
+  }
+
+  async function confirmMobility() {
+    setPersonalizeLoading(true);
+    try {
+      const exercises = await fetchExercises("recovery_tool");
+      setRecoveryExercises(exercises);
+      setSelectedRecovery(new Set(exercises.map((e) => e.id)));
+      setPersonalizeStep(5);
+    } catch {
+      // ignore
+    } finally {
+      setPersonalizeLoading(false);
+    }
+  }
+
+  async function confirmRecovery() {
+    setPersonalizeLoading(true);
+    try {
+      const supps = await fetchSupplements();
+      setSupplements(supps);
+      setSelectedSupplements(new Set()); // all OFF by default
+      setPersonalizeStep(6);
+    } catch {
+      // ignore
+    } finally {
+      setPersonalizeLoading(false);
+    }
+  }
+
+  async function confirmSupplements() {
+    setPersonalizeLoading(true);
+    try {
+      const allSelected = [
+        ...Array.from(selectedWarmup),
+        ...Array.from(selectedMobility),
+        ...Array.from(selectedRecovery),
+      ];
+      await fetch("/api/personalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          selectedExercises: allSelected,
+          selectedSupplements: Array.from(selectedSupplements),
+          daysPerWeek,
+        }),
+      });
+      setPersonalizeStep(7);
+    } catch {
+      // ignore
+    } finally {
+      setPersonalizeLoading(false);
+    }
+  }
+
+  function toggleSet(
+    set: Set<string>,
+    setter: (s: Set<string>) => void,
+    id: string
+  ) {
+    const next = new Set(set);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setter(next);
+  }
+
   const chips: { label: string; prompt: string }[] = [
     { label: "My status", prompt: "My status" },
     { label: "Today's focus", prompt: "Today's focus" },
     { label: "Weekly progress", prompt: "Weekly progress" },
     { label: "+ Add to plan", prompt: "I'd like to add something new to my plan — a tool, exercise, or supplement I have access to that isn't currently in my program." },
   ];
+
+  // Whether we're in personalize mode
+  const isPersonalizing = personalizeStep !== null;
+
+  /* ── Render Personalize Step UI ── */
+  function renderPersonalizeStep() {
+    if (personalizeStep === null) return null;
+
+    // Step 0: Welcome
+    if (personalizeStep === 0) {
+      return (
+        <div
+          style={{
+            background: "var(--s2)",
+            border: "1px solid var(--s3)",
+            borderRadius: 16,
+            padding: 24,
+            textAlign: "center",
+          }}
+        >
+          <div
+            style={{
+              width: 48,
+              height: 48,
+              borderRadius: "50%",
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 16px",
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="none">
+              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" />
+            </svg>
+          </div>
+          <h3
+            style={{
+              fontSize: 18,
+              fontWeight: 700,
+              color: "var(--tx)",
+              margin: "0 0 8px",
+            }}
+          >
+            Let&apos;s customize your plan!
+          </h3>
+          <p
+            style={{
+              fontSize: 14,
+              color: "var(--tx2)",
+              margin: "0 0 20px",
+              lineHeight: 1.5,
+            }}
+          >
+            I&apos;ll ask you a few questions, then you can pick your exercises
+            and supplements.
+          </p>
+          <button
+            onClick={startQuestionnaire}
+            style={{
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              color: "white",
+              border: "none",
+              borderRadius: 12,
+              padding: "14px 32px",
+              fontSize: 16,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Let&apos;s Go
+          </button>
+        </div>
+      );
+    }
+
+    // Step 1: AI conversation (rendered as normal messages above)
+    // Show "Continue" button when onboarding finalized
+    if (personalizeStep === 1) {
+      if (onboardingFinalized) {
+        return (
+          <div
+            style={{
+              background: "var(--s2)",
+              border: "1px solid var(--s3)",
+              borderRadius: 12,
+              padding: 16,
+              textAlign: "center",
+              marginTop: 12,
+            }}
+          >
+            <p
+              style={{
+                fontSize: 14,
+                color: "var(--tx2)",
+                margin: "0 0 12px",
+              }}
+            >
+              Profile captured! Ready to select your exercises.
+            </p>
+            <button
+              onClick={() => setPersonalizeStep(2)}
+              style={{
+                background: "var(--acc)",
+                color: "white",
+                border: "none",
+                borderRadius: 12,
+                padding: "12px 24px",
+                fontSize: 15,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              Continue to exercise selection
+            </button>
+          </div>
+        );
+      }
+      return null; // Chat is ongoing, no extra UI
+    }
+
+    // Step 2: Quick Start vs Customize + days selector
+    if (personalizeStep === 2) {
+      return (
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 16,
+          }}
+        >
+          <h3
+            style={{
+              fontSize: 17,
+              fontWeight: 700,
+              color: "var(--tx)",
+              margin: 0,
+              textAlign: "center",
+            }}
+          >
+            How do you want to set up?
+          </h3>
+
+          {/* Days per week */}
+          <div
+            style={{
+              background: "var(--s2)",
+              border: "1px solid var(--s3)",
+              borderRadius: 12,
+              padding: 16,
+            }}
+          >
+            <p
+              style={{
+                fontSize: 14,
+                fontWeight: 600,
+                color: "var(--tx)",
+                margin: "0 0 10px",
+              }}
+            >
+              Training days per week
+            </p>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+              {[2, 3, 4, 5, 6].map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDaysPerWeek(d)}
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 10,
+                    border: `2px solid ${daysPerWeek === d ? "var(--acc)" : "var(--brd)"}`,
+                    background:
+                      daysPerWeek === d
+                        ? "rgba(74,108,247,0.1)"
+                        : "var(--s1)",
+                    color:
+                      daysPerWeek === d ? "var(--acc)" : "var(--tx)",
+                    fontSize: 16,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Choice cards */}
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              onClick={handleQuickStart}
+              disabled={personalizeLoading}
+              style={{
+                flex: 1,
+                background: "var(--s2)",
+                border: "2px solid var(--s3)",
+                borderRadius: 14,
+                padding: 20,
+                textAlign: "center",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 28,
+                  marginBottom: 8,
+                }}
+              >
+                ⚡
+              </div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: "var(--tx)",
+                  marginBottom: 4,
+                }}
+              >
+                Quick Start
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--tx3)",
+                  lineHeight: 1.4,
+                }}
+              >
+                Use all exercises, generate plan now
+              </div>
+            </button>
+
+            <button
+              onClick={handleCustomize}
+              disabled={personalizeLoading}
+              style={{
+                flex: 1,
+                background: "var(--s2)",
+                border: "2px solid var(--acc)",
+                borderRadius: 14,
+                padding: 20,
+                textAlign: "center",
+                cursor: "pointer",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 28,
+                  marginBottom: 8,
+                }}
+              >
+                🎯
+              </div>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: "var(--tx)",
+                  marginBottom: 4,
+                }}
+              >
+                Customize First
+              </div>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "var(--tx3)",
+                  lineHeight: 1.4,
+                }}
+              >
+                Pick exercises per category
+              </div>
+            </button>
+          </div>
+
+          {personalizeLoading && (
+            <p
+              style={{
+                textAlign: "center",
+                fontSize: 13,
+                color: "var(--tx3)",
+              }}
+            >
+              Setting up...
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Steps 3-5: Exercise pickers
+    if (personalizeStep === 3) {
+      return (
+        <div>
+          <h3
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: "var(--tx)",
+              margin: "0 0 4px",
+            }}
+          >
+            Warm-Up Tools
+          </h3>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--tx3)",
+              margin: "0 0 14px",
+            }}
+          >
+            All selected by default. Tap to remove any you don&apos;t want.
+          </p>
+          <PickerGrid
+            items={warmupExercises}
+            selected={selectedWarmup}
+            onToggle={(id) => toggleSet(selectedWarmup, setSelectedWarmup, id)}
+            labelKey="name"
+            subKey="targets"
+            onConfirm={confirmWarmup}
+          />
+        </div>
+      );
+    }
+
+    if (personalizeStep === 4) {
+      return (
+        <div>
+          <h3
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: "var(--tx)",
+              margin: "0 0 4px",
+            }}
+          >
+            Mobility Exercises
+          </h3>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--tx3)",
+              margin: "0 0 14px",
+            }}
+          >
+            All selected by default. Tap to remove any you don&apos;t want.
+          </p>
+          <PickerGrid
+            items={mobilityExercises}
+            selected={selectedMobility}
+            onToggle={(id) =>
+              toggleSet(selectedMobility, setSelectedMobility, id)
+            }
+            labelKey="name"
+            subKey="targets"
+            onConfirm={confirmMobility}
+          />
+        </div>
+      );
+    }
+
+    if (personalizeStep === 5) {
+      return (
+        <div>
+          <h3
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: "var(--tx)",
+              margin: "0 0 4px",
+            }}
+          >
+            Recovery Tools
+          </h3>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--tx3)",
+              margin: "0 0 14px",
+            }}
+          >
+            All selected by default. Tap to remove any you don&apos;t want.
+          </p>
+          <PickerGrid
+            items={recoveryExercises}
+            selected={selectedRecovery}
+            onToggle={(id) =>
+              toggleSet(selectedRecovery, setSelectedRecovery, id)
+            }
+            labelKey="name"
+            subKey="targets"
+            onConfirm={confirmRecovery}
+          />
+        </div>
+      );
+    }
+
+    // Step 6: Supplement picker
+    if (personalizeStep === 6) {
+      return (
+        <div>
+          <h3
+            style={{
+              fontSize: 16,
+              fontWeight: 700,
+              color: "var(--tx)",
+              margin: "0 0 4px",
+            }}
+          >
+            Supplements
+          </h3>
+          <p
+            style={{
+              fontSize: 13,
+              color: "var(--tx3)",
+              margin: "0 0 14px",
+            }}
+          >
+            None selected by default. Tap to add any you take.
+          </p>
+          <PickerGrid
+            items={supplements}
+            selected={selectedSupplements}
+            onToggle={(id) =>
+              toggleSet(selectedSupplements, setSelectedSupplements, id)
+            }
+            labelKey="name"
+            subKey="dose"
+            onConfirm={confirmSupplements}
+          />
+          {personalizeLoading && (
+            <p
+              style={{
+                textAlign: "center",
+                fontSize: 13,
+                color: "var(--tx3)",
+                marginTop: 8,
+              }}
+            >
+              Saving your plan...
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Step 7: Complete
+    if (personalizeStep === 7) {
+      return (
+        <div
+          style={{
+            background: "var(--s2)",
+            border: "1px solid var(--s3)",
+            borderRadius: 16,
+            padding: 32,
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+          <h3
+            style={{
+              fontSize: 20,
+              fontWeight: 700,
+              color: "var(--tx)",
+              margin: "0 0 8px",
+            }}
+          >
+            Your plan is ready!
+          </h3>
+          <p
+            style={{
+              fontSize: 14,
+              color: "var(--tx2)",
+              margin: "0 0 20px",
+              lineHeight: 1.5,
+            }}
+          >
+            Your personalized mobility program has been generated. Time to get
+            moving!
+          </p>
+          <Link
+            href="/workout"
+            style={{
+              display: "inline-block",
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+              color: "white",
+              border: "none",
+              borderRadius: 12,
+              padding: "14px 32px",
+              fontSize: 16,
+              fontWeight: 700,
+              textDecoration: "none",
+              cursor: "pointer",
+            }}
+            onClick={() => setPersonalizeStep(null)}
+          >
+            Start Training
+          </Link>
+        </div>
+      );
+    }
+
+    return null;
+  }
 
   return (
     <div className="flex flex-col h-full" style={{ background: "var(--s1)" }}>
@@ -215,7 +1033,7 @@ function AIPage() {
 
       {/* ── Messages Area ── */}
       <div className="flex-1 overflow-y-auto px-3 py-4" style={{ background: "var(--s1)" }}>
-        {messages.length === 0 && (
+        {messages.length === 0 && !isPersonalizing && (
           <div className="flex flex-col gap-3">
             {/* Joke Card */}
             <div
@@ -269,9 +1087,29 @@ function AIPage() {
               <h2 className="text-[17px] font-bold mb-1" style={{ color: "var(--tx)" }}>
                 Your Mobility Coach
               </h2>
-              <p className="text-[13px] mb-6" style={{ color: "var(--tx3)" }}>
+              <p className="text-[13px] mb-4" style={{ color: "var(--tx3)" }}>
                 Ask me about your exercises, supplements, or plan
               </p>
+
+              {/* ── Personalize Plan Button ── */}
+              <button
+                onClick={() => setPersonalizeStep(0)}
+                style={{
+                  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: 12,
+                  padding: "14px 24px",
+                  fontSize: 15,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  marginBottom: 16,
+                  transition: "transform 0.15s ease, box-shadow 0.15s ease",
+                  boxShadow: "0 4px 14px rgba(99, 102, 241, 0.35)",
+                }}
+              >
+                Personalize Plan
+              </button>
 
               {/* Chips */}
               <div className="flex flex-wrap justify-center gap-2">
@@ -292,6 +1130,11 @@ function AIPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Personalization flow UI before messages (step 0 welcome, steps 2+ when no chat yet) */}
+        {isPersonalizing && personalizeStep !== 1 && messages.length === 0 && (
+          <div style={{ marginBottom: 16 }}>{renderPersonalizeStep()}</div>
         )}
 
         {messages.map((msg, i) => (
@@ -327,6 +1170,11 @@ function AIPage() {
           </div>
         ))}
 
+        {/* Personalization UI after messages (step 1 continue button, or picker steps after chat) */}
+        {isPersonalizing && messages.length > 0 && (
+          <div style={{ marginTop: 8 }}>{renderPersonalizeStep()}</div>
+        )}
+
         {loading && (
           <div className="flex gap-2 mb-3" style={{ animation: "fadeIn 0.3s ease" }}>
             <div
@@ -357,8 +1205,8 @@ function AIPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Chips bar (when messages exist) */}
-      {messages.length > 0 && (
+      {/* Chips bar (when messages exist and not in picker steps) */}
+      {messages.length > 0 && (!isPersonalizing || personalizeStep === 1) && (
         <div
           className="flex gap-1.5 px-3 py-2 overflow-x-auto"
           style={{
@@ -389,7 +1237,7 @@ function AIPage() {
         className="px-3 pt-2 pb-1"
         style={{
           background: "var(--bg)",
-          borderTop: messages.length === 0 ? "1px solid var(--s3)" : "none",
+          borderTop: messages.length === 0 && !isPersonalizing ? "1px solid var(--s3)" : "none",
         }}
       >
         <div
@@ -492,6 +1340,8 @@ function AIPage() {
             onClick={() => {
               setMessages([]);
               setInput("");
+              setPersonalizeStep(null);
+              setOnboardingFinalized(false);
               setSidebarOpen(false);
             }}
             className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-150"

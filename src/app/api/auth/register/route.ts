@@ -33,9 +33,9 @@ export async function POST(req: NextRequest) {
     generatePlanForUser(user.id, program.id, today).catch(console.error);
   }
 
-  // Create initial preferences (onboarding step 0)
+  // Create initial preferences (onboarding complete)
   await prisma.userPreferences.create({
-    data: { userId: user.id },
+    data: { userId: user.id, onboardingStep: 7 },
   });
 
   await createSession(user.id);

@@ -24,7 +24,7 @@ export default function LoginPage() {
     const data = await res.json();
 
     if (data.ok) {
-      router.push("/ai");
+      router.push("/workout");
     } else {
       setError(data.error || "Login failed");
       setLoading(false);

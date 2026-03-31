@@ -26,7 +26,7 @@ export default function RegisterPage() {
     const data = await res.json();
 
     if (data.ok) {
-      router.push("/ai");
+      router.push("/workout");
     } else {
       setError(data.error || "Registration failed");
       setLoading(false);

@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/ai", label: "AI", icon: "ai" },
@@ -56,21 +55,6 @@ function NavIcon({ name, active }: { name: string; active: boolean }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-
-  useEffect(() => {
-    const unlocked = ["/ai", "/login", "/register"];
-    if (unlocked.includes(pathname) || pathname.startsWith("/api/")) return;
-
-    fetch("/api/auth/me")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (data?.user && data.user.onboardingStep < 7) {
-          router.push("/ai");
-        }
-      })
-      .catch(() => {});
-  }, [pathname, router]);
 
   return (
     <div className="flex flex-col h-[100dvh]">
