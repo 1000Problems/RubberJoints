@@ -904,6 +904,20 @@ export default function WorkoutPage() {
                             {item.rx}
                           </div>
                         )}
+
+                        {/* Expand chevron */}
+                        <span
+                          style={{
+                            color: "var(--tx3)",
+                            fontSize: "16px",
+                            flexShrink: 0,
+                            transform: isExpanded ? "rotate(90deg)" : "none",
+                            transition: "transform 0.15s ease",
+                            marginLeft: "4px",
+                          }}
+                        >
+                          ›
+                        </span>
                       </div>
 
                       {/* Expanded detail */}
