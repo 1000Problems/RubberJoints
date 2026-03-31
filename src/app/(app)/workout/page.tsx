@@ -347,9 +347,8 @@ export default function WorkoutPage() {
     const prog = getCategoryProgress(cat);
     progressRows.push({ key: cat, label: categoryLabels[cat], color: categoryColors[cat], ...prog });
   }
-  if (supplements.length > 0) {
-    progressRows.push({ key: "vitamins", label: "Vitamins", color: "#ffcc00", ...suppProgress });
-  }
+  // Always show Vitamins row (even if 0/0)
+  progressRows.push({ key: "vitamins", label: "Vitamins", color: "#ffcc00", ...suppProgress });
 
   return (
     <div>
