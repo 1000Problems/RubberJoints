@@ -15,47 +15,87 @@ export async function GET(req: NextRequest) {
 
   const todayStr = todayPacificStr();
   const dateParam = req.nextUrl.searchParams.get("date");
-  const dateStr = dateParam || todayStr;
-  const date = new Date(dateStr + "T00:00:00Z");
+  const anchorStr = dateParam || todayStr;
+  const anchorDate = new Date(anchorStr + "T00:00:00Z");
 
-  const [plan, supplements, dailyChecks] = await Promise.all([
+  // Calculate Monday of the week containing the anchor date
+  const anchorDay = anchorDate.getUTCDay(); // 0=Sun
+  const mondayOffset = anchorDay === 0 ? -6 : 1 - anchorDay;
+  const monday = new Date(anchorDate);
+  monday.setUTCDate(monday.getUTCDate() + mondayOffset);
+
+  const sunday = new Date(monday);
+  sunday.setUTCDate(sunday.getUTCDate() + 6);
+
+  // Fetch the entire week's data in bulk
+  const [weekPlan, supplements, weekChecks] = await Promise.all([
     prisma.userDailyPlan.findMany({
-      where: { userId: session.userId, date },
+      where: {
+        userId: session.userId,
+        date: { gte: monday, lte: sunday },
+      },
       include: { exercise: true },
-      orderBy: { sortOrder: "asc" },
+      orderBy: [{ date: "asc" }, { sortOrder: "asc" }],
     }),
     prisma.userSupplement.findMany({
       where: { userId: session.userId },
       include: { supplement: true },
     }),
     prisma.dailyCheck.findMany({
-      where: { userId: session.userId, date },
+      where: {
+        userId: session.userId,
+        date: { gte: monday, lte: sunday },
+      },
     }),
   ]);
 
-  // Build check state map
-  const checks: Record<string, boolean> = {};
-  for (const c of dailyChecks) {
-    checks[`${c.itemType}:${c.itemId}:${c.stepIndex}`] = c.checked;
+  // Build per-day data
+  const days: Record<string, {
+    plan: typeof weekPlan;
+    checks: Record<string, boolean>;
+    dayType: string;
+    dayLabel: string;
+    isFuture: boolean;
+  }> = {};
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setUTCDate(d.getUTCDate() + i);
+    const dStr = d.toISOString().split("T")[0];
+
+    const dayPlan = weekPlan.filter((p) => {
+      const pStr = p.date instanceof Date
+        ? p.date.toISOString().split("T")[0]
+        : String(p.date).split("T")[0];
+      return pStr === dStr;
+    });
+
+    const dayChecks: Record<string, boolean> = {};
+    for (const c of weekChecks) {
+      const cStr = c.date instanceof Date
+        ? c.date.toISOString().split("T")[0]
+        : String(c.date).split("T")[0];
+      if (cStr === dStr) {
+        dayChecks[`${c.itemType}:${c.itemId}:${c.stepIndex}`] = c.checked;
+      }
+    }
+
+    const dayType = dayPlan.length > 0 ? (dayPlan[0].dayType || "training") : "rest";
+    const dayName = DAY_NAMES[d.getUTCDay()];
+    const dayLabel = (dayType === "rest" || dayPlan.length === 0)
+      ? `${dayName} . Rest Day`
+      : `${dayName} . Training Session`;
+
+    days[dStr] = {
+      plan: dayPlan,
+      checks: dayChecks,
+      dayType,
+      dayLabel,
+      isFuture: dStr > todayStr,
+    };
   }
 
-  // Determine day type and label from the plan entries
-  const dayType = plan.length > 0 ? (plan[0].dayType || "training") : "rest";
-  const dayName = DAY_NAMES[date.getUTCDay()];
-
-  let dayLabel: string;
-  if (dayType === "rest" || plan.length === 0) {
-    dayLabel = `${dayName} . Rest Day`;
-  } else {
-    dayLabel = `${dayName} . Training Session`;
-  }
-
-  // Build week days array (Mon-Sun around the selected date)
-  const selectedDay = date.getUTCDay(); // 0=Sun
-  const mondayOffset = selectedDay === 0 ? -6 : 1 - selectedDay;
-  const monday = new Date(date);
-  monday.setUTCDate(monday.getUTCDate() + mondayOffset);
-
+  // Build weekDays metadata
   const weekDays = [];
   for (let i = 0; i < 7; i++) {
     const d = new Date(monday);
@@ -66,20 +106,16 @@ export async function GET(req: NextRequest) {
       dayLabel: DAY_SHORT[d.getUTCDay()],
       dayNumber: d.getUTCDate(),
       isToday: dStr === todayStr,
-      isSelected: dStr === dateStr,
+      isSelected: dStr === anchorStr,
       isPast: dStr < todayStr,
     });
   }
 
-  const isFuture = dateStr > todayStr;
-
   return NextResponse.json({
-    plan,
+    days,
     supplements,
-    checks,
-    dayType,
-    dayLabel,
     weekDays,
-    isFuture,
+    selectedDate: anchorStr,
+    todayStr,
   });
 }

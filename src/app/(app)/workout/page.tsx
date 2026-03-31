@@ -87,20 +87,32 @@ const CATEGORIES = ["warmup_tool", "mobility", "recovery_tool"];
 
 /* ── Component ── */
 
+interface DayData {
+  plan: PlanItem[];
+  checks: CheckState;
+  dayType: string;
+  dayLabel: string;
+  isFuture: boolean;
+}
+
 export default function WorkoutPage() {
   const router = useRouter();
-  const [plan, setPlan] = useState<PlanItem[]>([]);
+  const [allDays, setAllDays] = useState<Record<string, DayData>>({});
   const [supplements, setSupplements] = useState<SupplementItem[]>([]);
-  const [checks, setChecks] = useState<CheckState>({});
   const [date, setDate] = useState(() =>
     new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
   );
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [dayLabel, setDayLabel] = useState("");
   const [weekDays, setWeekDays] = useState<WeekDay[]>([]);
-  const [isFuture, setIsFuture] = useState(false);
   const [username, setUsername] = useState("");
+
+  // Derived from allDays for the selected date
+  const currentDay = allDays[date];
+  const plan = currentDay?.plan || [];
+  const checks = currentDay?.checks || {};
+  const dayLabel = currentDay?.dayLabel || "";
+  const isFuture = currentDay?.isFuture || false;
 
   // Picker state
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -114,36 +126,39 @@ export default function WorkoutPage() {
   const touchStartX = useRef(0);
   const touchStartY = useRef(0);
 
-  const [transitioning, setTransitioning] = useState(false);
-  const hasLoadedOnce = useRef(false);
+  // Track which week is loaded to avoid re-fetching within same week
+  const loadedWeekMonday = useRef("");
 
-  const loadDay = useCallback(async () => {
-    if (hasLoadedOnce.current) {
-      setTransitioning(true);
-    } else {
-      setLoading(true);
-    }
+  const loadWeek = useCallback(async (targetDate: string) => {
+    // Calculate Monday for this date
+    const d = new Date(targetDate + "T00:00:00Z");
+    const day = d.getUTCDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const mon = new Date(d);
+    mon.setUTCDate(mon.getUTCDate() + mondayOffset);
+    const mondayStr = mon.toISOString().split("T")[0];
+
+    // Skip fetch if this week is already loaded
+    if (mondayStr === loadedWeekMonday.current) return;
+
+    setLoading(Object.keys(allDays).length === 0);
     try {
-      const res = await fetch(`/api/workout?date=${date}`);
+      const res = await fetch(`/api/workout?date=${targetDate}`);
       const data = await res.json();
-      setPlan(data.plan || []);
+      setAllDays(data.days || {});
       setSupplements(data.supplements || []);
-      setChecks(data.checks || {});
-      setDayLabel(data.dayLabel || "");
       setWeekDays(data.weekDays || []);
-      setIsFuture(data.isFuture || false);
-      hasLoadedOnce.current = true;
+      loadedWeekMonday.current = mondayStr;
     } catch {
       // ignore
     } finally {
       setLoading(false);
-      setTransitioning(false);
     }
-  }, [date]);
+  }, [allDays]);
 
   useEffect(() => {
-    loadDay();
-  }, [loadDay]);
+    loadWeek(date);
+  }, [date, loadWeek]);
 
   // Fetch username
   useEffect(() => {
@@ -210,10 +225,18 @@ export default function WorkoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date]);
 
+  function updateChecksForDate(dateKey: string, checkKey: string, value: boolean) {
+    setAllDays((prev) => {
+      const day = prev[dateKey];
+      if (!day) return prev;
+      return { ...prev, [dateKey]: { ...day, checks: { ...day.checks, [checkKey]: value } } };
+    });
+  }
+
   async function toggleCheck(itemType: string, itemId: string, stepIndex: number) {
     const key = `${itemType}:${itemId}:${stepIndex}`;
     const newChecked = !checks[key];
-    setChecks((prev) => ({ ...prev, [key]: newChecked }));
+    updateChecksForDate(date, key, newChecked);
     try {
       await fetch("/api/check", {
         method: "POST",
@@ -221,7 +244,7 @@ export default function WorkoutPage() {
         body: JSON.stringify({ date, itemType, itemId, stepIndex, checked: newChecked }),
       });
     } catch {
-      setChecks((prev) => ({ ...prev, [key]: !newChecked }));
+      updateChecksForDate(date, key, !newChecked);
     }
   }
 
@@ -285,6 +308,11 @@ export default function WorkoutPage() {
     }
   }
 
+  async function reloadWeek() {
+    loadedWeekMonday.current = ""; // force re-fetch
+    await loadWeek(date);
+  }
+
   async function selectExercise(exerciseId: string) {
     setPickerOpen(false);
     try {
@@ -293,7 +321,7 @@ export default function WorkoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exerciseId, date }),
       });
-      loadDay();
+      await reloadWeek();
     } catch {
       // ignore
     }
@@ -307,7 +335,7 @@ export default function WorkoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ supplementId, timeGroup }),
       });
-      loadDay();
+      await reloadWeek();
     } catch {
       // ignore
     }
@@ -325,7 +353,7 @@ export default function WorkoutPage() {
         next.delete(exerciseId);
         return next;
       });
-      loadDay();
+      await reloadWeek();
     } catch {
       // ignore
     }
@@ -340,7 +368,7 @@ export default function WorkoutPage() {
     router.push("/login");
   }
 
-  if (loading && !hasLoadedOnce.current) {
+  if (loading && Object.keys(allDays).length === 0) {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "256px" }}>
         <div style={{ color: "var(--tx3)", fontSize: "13px" }}>Loading...</div>
@@ -361,7 +389,7 @@ export default function WorkoutPage() {
   progressRows.push({ key: "vitamins", label: "Vitamins", color: "#ffcc00", ...suppProgress });
 
   return (
-    <div style={{ opacity: transitioning ? 0.5 : 1, transition: "opacity 0.15s ease" }}>
+    <div>
       {/* ── 0. Username / Sign out bar ── */}
       {username && (
         <div
