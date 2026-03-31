@@ -48,11 +48,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--s3); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: var(--brd); }
+/* Hide scrollbar but keep scrolling */
+::-webkit-scrollbar { display: none; }
+* { scrollbar-width: none; }
 
 /* Animations */
 @keyframes fadeIn {
