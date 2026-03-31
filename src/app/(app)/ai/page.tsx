@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface Message {
@@ -38,7 +39,16 @@ const JOKES = [
   "Recovery day = the only day my joints don't roast me.",
 ];
 
-export default function AIPage() {
+export default function AIPageWrapper() {
+  return (
+    <Suspense fallback={<div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "256px" }}><div style={{ color: "var(--tx3)", fontSize: "13px" }}>Loading...</div></div>}>
+      <AIPage />
+    </Suspense>
+  );
+}
+
+function AIPage() {
+  const searchParams = useSearchParams();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,6 +57,7 @@ export default function AIPage() {
   const [jokeIndex, setJokeIndex] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoPromptSent = useRef(false);
 
   // Week/phase info (static for now, could be fetched)
   const currentWeek = 1;
@@ -72,6 +83,16 @@ export default function AIPage() {
       })
       .catch(() => {});
   }, []);
+
+  // Auto-send prompt from ?prompt= query parameter
+  useEffect(() => {
+    const prompt = searchParams.get("prompt");
+    if (prompt && !autoPromptSent.current && !loading) {
+      autoPromptSent.current = true;
+      sendMessage(prompt);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   function autoResize() {
     const ta = textareaRef.current;

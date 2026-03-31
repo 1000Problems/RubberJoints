@@ -756,7 +756,7 @@ export default function WorkoutPage() {
               {/* Ask AI button */}
               {items.length > 0 && (
                 <a
-                  href={`/ai?prompt=${encodeURIComponent(`Help me with my ${categoryLabels[cat]} exercises`)}`}
+                  href={`/ai?prompt=${encodeURIComponent(`Explain why these ${categoryLabels[cat].toLowerCase()} exercises were chosen for today: ${items.map(i => i.exercise.name).join(", ")}. Why are they in my plan today? Were any of them selected because I previously skipped them? Also, remind me that I can tap on each exercise name in the Workout tab for a detailed description and demo video.`)}`}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1027,7 +1027,7 @@ export default function WorkoutPage() {
           {/* Ask AI button */}
           {supplements.length > 0 && (
             <a
-              href={`/ai?prompt=${encodeURIComponent("Help me with my supplement routine")}`}
+              href={`/ai?prompt=${encodeURIComponent(`Explain my current supplement routine: ${supplements.map(s => s.supplement.name).join(", ")}. Why were these chosen? Are there any I should consider adding or adjusting based on my goals?`)}`}
               style={{
                 display: "flex",
                 alignItems: "center",
