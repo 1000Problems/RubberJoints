@@ -915,6 +915,7 @@ export default function WorkoutPage() {
                       {/* Expanded detail */}
                       {isExpanded && (
                         <div
+                          onClick={(e) => e.stopPropagation()}
                           style={{
                             background: "var(--s2)",
                             padding: "0 16px 14px 54px",
