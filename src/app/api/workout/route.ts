@@ -83,8 +83,8 @@ export async function GET(req: NextRequest) {
     const dayType = dayPlan.length > 0 ? (dayPlan[0].dayType || "training") : "rest";
     const dayName = DAY_NAMES[d.getUTCDay()];
     const dayLabel = (dayType === "rest" || dayPlan.length === 0)
-      ? `${dayName} . Rest Day`
-      : `${dayName} . Training Session`;
+      ? `${dayName} · Rest`
+      : `${dayName} · Training`;
 
     days[dStr] = {
       plan: dayPlan,

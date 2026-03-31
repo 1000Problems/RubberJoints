@@ -267,12 +267,19 @@ export default function WorkoutPage() {
     return { done, total: supplements.length, pct: Math.round((done / supplements.length) * 100) };
   }
 
+  const todayPST = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
+  const isToday = date === todayPST;
+
   function getDayDisplayLabel() {
+    if (isToday) return "Today";
     const d = new Date(date + "T12:00:00");
-    const todayPST = new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" });
-    const label = d.toLocaleDateString("en-US", { weekday: "long" });
-    if (date === todayPST) return "Today";
-    return label;
+    return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  }
+
+  function getCardTitle() {
+    if (isToday) return "TODAY'S WORKOUT";
+    const d = new Date(date + "T12:00:00");
+    return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
   }
 
   // Picker helpers
@@ -456,9 +463,9 @@ export default function WorkoutPage() {
           <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--tx)" }}>
             {getDayDisplayLabel()}
           </div>
-          {date !== new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }) && (
+          {!isToday && (
             <button
-              onClick={() => setDate(new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }))}
+              onClick={() => setDate(todayPST)}
               style={{
                 fontSize: "13px",
                 fontWeight: 500,
@@ -495,23 +502,7 @@ export default function WorkoutPage() {
         </button>
       </div>
 
-      {/* ── Future Day Notice ── */}
-      {isFuture && (
-        <div
-          style={{
-            margin: "0 16px 8px",
-            padding: "8px 14px",
-            borderRadius: "10px",
-            background: "var(--s2)",
-            border: "1px dashed var(--brd)",
-            fontSize: "12px",
-            color: "var(--tx3)",
-            textAlign: "center",
-          }}
-        >
-          Preview — exercises can&apos;t be checked off for future days
-        </div>
-      )}
+      {/* Future notice removed — PREVIEW badge is inline in activity card */}
 
       {/* ── 2. Activity Summary Card ── */}
       <div
@@ -533,16 +524,34 @@ export default function WorkoutPage() {
             marginBottom: "4px",
           }}
         >
-          TODAY&apos;S WORKOUT
+          {getCardTitle()}
         </div>
         <div
           style={{
             fontSize: "13px",
             color: "var(--tx2)",
             marginBottom: "14px",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
           }}
         >
-          {dayLabel}
+          <span>{dayLabel}</span>
+          {isFuture && (
+            <span
+              style={{
+                fontSize: "10px",
+                fontWeight: 700,
+                color: "var(--org)",
+                background: "rgba(255,149,0,0.12)",
+                padding: "2px 6px",
+                borderRadius: "4px",
+                textTransform: "uppercase",
+              }}
+            >
+              Preview
+            </span>
+          )}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
           {progressRows.map((row) => (
