@@ -1275,16 +1275,13 @@ export default function WorkoutPage() {
                         }}
                       >
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                          <div>
+                          <div style={{ flex: 1 }}>
                             <div style={{ fontSize: "15px", color: "var(--tx)", fontWeight: 500 }}>{ex.name}</div>
                             {ex.targets && (
                               <div style={{ fontSize: "12px", color: "var(--tx3)", marginTop: "2px" }}>{ex.targets}</div>
                             )}
-                            {ex.defaultRx && (
-                              <div style={{ fontSize: "12px", color: "var(--tx2)", marginTop: "2px" }}>{ex.defaultRx}</div>
-                            )}
                           </div>
-                          {alreadyAdded && (
+                          {alreadyAdded ? (
                             <span
                               style={{
                                 fontSize: "11px",
@@ -1293,11 +1290,16 @@ export default function WorkoutPage() {
                                 background: "var(--s2)",
                                 padding: "2px 8px",
                                 borderRadius: "4px",
+                                whiteSpace: "nowrap",
                               }}
                             >
                               Added
                             </span>
-                          )}
+                          ) : ex.defaultRx ? (
+                            <span style={{ fontSize: "13px", color: "var(--tx2)", whiteSpace: "nowrap", marginLeft: "12px" }}>
+                              {ex.defaultRx}
+                            </span>
+                          ) : null}
                         </div>
                       </button>
                     );

@@ -79,7 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </main>
       <nav
         className="fixed bottom-0 left-1/2 -translate-x-1/2 flex justify-around items-center bg-[var(--s1)] border-t border-[var(--brd)] z-50"
-        style={{ height: "64px", paddingBottom: "env(safe-area-inset-bottom, 0px)", width: "100%", maxWidth: "480px" }}
+        style={{ height: "64px", paddingBottom: "env(safe-area-inset-bottom, 0px)", width: "100%", maxWidth: "408px" }}
       >
         {navItems.map((item) => {
           const active = pathname === item.href;
