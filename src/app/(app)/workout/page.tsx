@@ -99,13 +99,18 @@ export default function WorkoutPage() {
   const router = useRouter();
   const [allDays, setAllDays] = useState<Record<string, DayData>>({});
   const [supplements, setSupplements] = useState<SupplementItem[]>([]);
-  const [date, setDate] = useState(() =>
-    new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" })
-  );
+  const [date, setDate] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [weekDays, setWeekDays] = useState<WeekDay[]>([]);
   const [username, setUsername] = useState("");
+
+  // Set initial date on client only to avoid SSR mismatch
+  useEffect(() => {
+    if (!date) {
+      setDate(new Date().toLocaleDateString("en-CA", { timeZone: "America/Los_Angeles" }));
+    }
+  }, [date]);
 
   // Derived from allDays for the selected date
   const currentDay = allDays[date];
@@ -157,7 +162,7 @@ export default function WorkoutPage() {
   }, [allDays]);
 
   useEffect(() => {
-    loadWeek(date);
+    if (date) loadWeek(date);
   }, [date, loadWeek]);
 
   // Fetch username
