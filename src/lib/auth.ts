@@ -9,11 +9,16 @@ const SESSION_MAX_AGE = 30 * 24 * 60 * 60; // 30 days in seconds
 // Simple token-based sessions stored as signed cookies
 // Token format: userId:randomBytes:hmac
 
+function getSessionSecret(): string {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new Error("SESSION_SECRET environment variable is required");
+  return secret;
+}
+
 function signToken(userId: number): string {
   const random = crypto.randomBytes(32).toString("hex");
   const data = `${userId}:${random}`;
-  const secret = process.env.SESSION_SECRET || "dev-secret-change-me";
-  const hmac = crypto.createHmac("sha256", secret).update(data).digest("hex");
+  const hmac = crypto.createHmac("sha256", getSessionSecret()).update(data).digest("hex");
   return `${data}:${hmac}`;
 }
 
@@ -21,12 +26,11 @@ function verifyToken(token: string): number | null {
   const parts = token.split(":");
   if (parts.length !== 3) return null;
   const [userId, random, hmac] = parts;
-  const secret = process.env.SESSION_SECRET || "dev-secret-change-me";
   const expected = crypto
-    .createHmac("sha256", secret)
+    .createHmac("sha256", getSessionSecret())
     .update(`${userId}:${random}`)
     .digest("hex");
-  if (hmac !== expected) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(hmac, "hex"), Buffer.from(expected, "hex"))) return null;
   return parseInt(userId, 10);
 }
 

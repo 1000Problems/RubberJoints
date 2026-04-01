@@ -6,6 +6,23 @@ import { todayPacific, formatDate, addDays } from "@/lib/dates";
 
 const anthropic = new Anthropic();
 
+// Simple in-memory rate limiting (per-user, per-day)
+const MAX_DAILY_MESSAGES = 100;
+const dailyMessageCounts = new Map<string, { count: number; date: string }>();
+
+function checkRateLimit(userId: number): boolean {
+  const today = new Date().toISOString().split("T")[0];
+  const key = `${userId}`;
+  const entry = dailyMessageCounts.get(key);
+  if (!entry || entry.date !== today) {
+    dailyMessageCounts.set(key, { count: 1, date: today });
+    return true;
+  }
+  if (entry.count >= MAX_DAILY_MESSAGES) return false;
+  entry.count++;
+  return true;
+}
+
 const tools: Anthropic.Tool[] = [
   {
     name: "get_all_exercises",
@@ -377,6 +394,10 @@ Use tools to modify the user's plan when they ask. You can create custom exercis
 export async function POST(req: NextRequest) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  if (!checkRateLimit(session.userId)) {
+    return NextResponse.json({ error: "Daily message limit reached. Try again tomorrow!" }, { status: 429 });
+  }
 
   const { messages } = await req.json();
   if (!messages || !Array.isArray(messages)) {
